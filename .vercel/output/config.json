@@ -1,0 +1,47 @@
+{
+	"version": 3,
+	"routes": [
+		{
+			"src": "/_app/immutable/.+",
+			"headers": {
+				"cache-control": "public, immutable, max-age=31536000"
+			}
+		},
+		{
+			"handle": "filesystem"
+		},
+		{
+			"src": "^/?(?:/__data.json)?$",
+			"dest": "/"
+		},
+		{
+			"src": "^/accounts/([^/]+?)/?(?:/__data.json)?$",
+			"dest": "/accounts/[platform]"
+		},
+		{
+			"src": "^/api/accounts/bsky/?(?:/__data.json)?$",
+			"dest": "/api/accounts/bsky"
+		},
+		{
+			"src": "^/compare/([^/]+?)/?(?:/__data.json)?$",
+			"dest": "/compare/[matchId]"
+		},
+		{
+			"src": "^/live/bsky/stream\\.sse/?(?:/__data.json)?$",
+			"dest": "/live/bsky/stream.sse"
+		},
+		{
+			"src": "^/live/twitter/stream\\.sse/?(?:/__data.json)?$",
+			"dest": "/live/twitter/stream.sse"
+		},
+		{
+			"src": "^/match/([^/]+?)/?(?:/__data.json)?$",
+			"dest": "/match/[id]"
+		},
+		{
+			"src": "/.*",
+			"dest": "/![-]/catchall"
+		}
+	],
+	"overrides": {}
+}
