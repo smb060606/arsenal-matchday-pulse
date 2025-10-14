@@ -185,7 +185,9 @@ export async function fetchRecentPostsForAccounts(
   sinceMinutes: number = DEFAULT_RECENCY_MINUTES
 ): Promise<SimplePost[]> {
   const agent = await getAgent();
-  const since = Date.now() - sinceMinutes * 60_000;
+  const minutes = Number(sinceMinutes);
+  const validatedMinutes = Number.isFinite(minutes) && minutes > 0 ? minutes : DEFAULT_RECENCY_MINUTES;
+  const since = Date.now() - validatedMinutes * 60_000;
 
   const out: SimplePost[] = [];
 

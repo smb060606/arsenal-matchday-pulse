@@ -81,7 +81,7 @@ test('Allowlist contains valid handles', () => {
   assertEqual(allowlist.length, 5, 'Should have 5 handles');
   
   allowlist.forEach(handle => {
-    assert(handle.includes('.') || handle.includes('.'), `Handle ${handle} should be valid`);
+    assert(handle.includes('.'), `Handle ${handle} should contain a dot`);
   });
 });
 
@@ -213,11 +213,11 @@ test('Test files exist', () => {
   const testFiles = [
     'src/lib/services/bskyService.test.ts',
     'src/lib/config/bsky.test.ts',
-    'src/routes/live/bsky/stream.sse/+server.test.ts',
-    'src/routes/accounts/[platform]/+page.test.ts',
-    'src/routes/api/accounts/bsky/+server.test.ts',
-    'src/routes/+page.test.ts',
-    'src/routes/match/[id]/+page.test.ts'
+    'src/routes/live/bsky/stream.sse/server.test.ts',
+    'src/routes/accounts/[platform]/page.test.ts',
+    'src/routes/api/accounts/bsky/server.test.ts',
+    'src/routes/page.test.ts',
+    'src/routes/match/[id]/page.test.ts'
   ];
 
   let existingTests = 0;
@@ -309,4 +309,3 @@ if (failed === 0) {
   console.log(`\n⚠️  ${failed} test(s) failed. Please review the errors above.`);
   process.exit(1);
 }
-

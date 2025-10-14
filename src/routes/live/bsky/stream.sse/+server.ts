@@ -14,10 +14,17 @@ export const GET: RequestHandler = async ({ setHeaders, url }) => {
   const window: 'pre' | 'live' | 'post' =
     windowParam === 'pre' || windowParam === 'post' ? (windowParam as any) : 'live';
 
-  const intervalSec = Number(url.searchParams.get('intervalSec') ?? DEFAULT_TICK_INTERVAL_SEC);
-  const sinceMin = Number(url.searchParams.get('sinceMin') ?? DEFAULT_RECENCY_MINUTES);
+  const nInterval = Number(url.searchParams.get('intervalSec'));
+  const intervalSec = Math.max(
+    1,
+    Number.isFinite(nInterval) && nInterval > 0 ? nInterval : DEFAULT_TICK_INTERVAL_SEC
+  );
+  const nSince = Number(url.searchParams.get('sinceMin'));
+  const sinceMin = Number.isFinite(nSince) && nSince > 0 ? nSince : DEFAULT_RECENCY_MINUTES;
 
   const encoder = new TextEncoder();
+  let stopped = false;
+  let closer: ReturnType<typeof setTimeout> | null = null;
 
   const stream = new ReadableStream({
     start(controller) {
@@ -25,29 +32,36 @@ export const GET: RequestHandler = async ({ setHeaders, url }) => {
       controller.enqueue(encoder.encode(': stream start\n\n'));
 
       let tick = 0;
-      const iv = setInterval(async () => {
-        try {
-          const payload = await buildTick(matchId, window, tick++, sinceMin);
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
-        } catch (e) {
-          const err = { message: 'tick_failed' };
-          controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify(err)}\n\n`));
+
+      const loop = async () => {
+        while (!stopped) {
+          try {
+            const payload = await buildTick(matchId, window, tick++, sinceMin);
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+          } catch (e) {
+            const err = { message: 'tick_failed' };
+            controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify(err)}\n\n`));
+          }
+          await new Promise((r) => setTimeout(r, intervalSec * 1000));
         }
-      }, Math.max(1, intervalSec) * 1000);
+      };
+
+      loop().catch(() => {
+        try { controller.close(); } catch {}
+      });
 
       // Soft cap the connection to 15 minutes; client can reconnect
-      const closer = setTimeout(() => {
-        clearInterval(iv);
+      closer = setTimeout(() => {
+        stopped = true;
         controller.close();
       }, 15 * 60 * 1000);
-
-      // Optional: handle client cancellation
-      // @ts-ignore - TS lib dom types may not include oncancel for ReadableStreamDefaultController
-      controller.signal?.addEventListener?.('abort', () => {
-        clearInterval(iv);
+    },
+    cancel() {
+      stopped = true;
+      if (closer) {
         clearTimeout(closer);
-        controller.close();
-      });
+        closer = null;
+      }
     }
   });
 
