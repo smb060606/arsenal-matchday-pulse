@@ -23,19 +23,20 @@
   },
   "dependencies": {
     "@atproto/api": "^0.13.22",
+    "openai": "^6.3.0",
     "wink-sentiment": "^5.0.0"
   },
   "devDependencies": {
-    "@sveltejs/adapter-vercel": "^5.3.0",
+    "@sveltejs/adapter-vercel": "^5.10.3",
     "@sveltejs/kit": "^2.46.5",
-    "@vitest/coverage-v8": "^1.6.0",
-    "@vitest/ui": "^1.6.0",
+    "@vitest/coverage-v8": "^1.6.1",
+    "@vitest/ui": "^1.6.1",
     "jsdom": "^25.0.1",
-    "svelte": "^5.0.0",
-    "svelte-check": "^4.0.0",
+    "svelte": "^5.39.12",
+    "svelte-check": "^4.3.3",
     "tslib": "^2.8.1",
-    "typescript": "^5.6.3",
-    "vite": "^6.3.0",
-    "vitest": "^1.6.0"
+    "typescript": "^5.9.3",
+    "vite": "^6.3.6",
+    "vitest": "^1.6.1"
   }
 }
