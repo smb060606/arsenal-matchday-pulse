@@ -80,11 +80,11 @@ export function createMockFeedResponse(posts: MockPost[] = []) {
           uri: post.uri,
           cid: post.cid,
           author: post.author,
-          indexedAt: post.createdAt
-        },
-        record: {
-          text: post.text,
-          createdAt: post.createdAt
+          indexedAt: post.createdAt,
+          record: {
+            text: post.text,
+            createdAt: post.createdAt
+          }
         }
       }))
     }
@@ -212,4 +212,3 @@ export function expectValidDID(did: string): void {
 export function expectValidBlueskyHandle(handle: string): void {
   expect(handle).toMatch(/^[a-zA-Z0-9.-]+(\.bsky\.social|\.com)$/);
 }
-

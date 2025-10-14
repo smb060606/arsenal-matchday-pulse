@@ -40,11 +40,11 @@ function checkTestFiles() {
   const testFiles = [
     'src/lib/services/bskyService.test.ts',
     'src/lib/config/bsky.test.ts',
-    'src/routes/live/bsky/stream.sse/+server.test.ts',
-    'src/routes/accounts/[platform]/+page.test.ts',
-    'src/routes/api/accounts/bsky/+server.test.ts',
-    'src/routes/+page.test.ts',
-    'src/routes/match/[id]/+page.test.ts'
+    'src/routes/live/bsky/stream.sse/server.test.ts',
+    'src/routes/accounts/[platform]/page.test.ts',
+    'src/routes/api/accounts/bsky/server.test.ts',
+    'src/routes/page.test.ts',
+    'src/routes/match/[id]/page.test.ts'
   ];
 
   const missingFiles = testFiles.filter(file => !existsSync(file));
@@ -67,21 +67,27 @@ function main() {
   checkTestFiles();
 
   switch (command) {
-    case 'unit':
-      runCommand(TEST_COMMANDS.unit, 'Running unit tests');
+    case 'unit': {
+      const pat = TEST_PATTERNS[pattern] ?? pattern;
+      runCommand(`${TEST_COMMANDS.unit} "${pat}"`, 'Running unit tests');
       break;
+    }
     case 'watch':
       runCommand(TEST_COMMANDS.watch, 'Running tests in watch mode');
       break;
-    case 'coverage':
-      runCommand(TEST_COMMANDS.coverage, 'Running tests with coverage');
+    case 'coverage': {
+      const pat = TEST_PATTERNS[pattern] ?? pattern;
+      runCommand(`${TEST_COMMANDS.coverage} "${pat}"`, 'Running tests with coverage');
       break;
+    }
     case 'ui':
       runCommand(TEST_COMMANDS.ui, 'Opening test UI');
       break;
-    case 'all':
-      runCommand(`${TEST_COMMANDS.unit} --reporter=verbose`, 'Running all tests with verbose output');
+    case 'all': {
+      const pat = TEST_PATTERNS[pattern] ?? pattern;
+      runCommand(`${TEST_COMMANDS.unit} "${pat}" --reporter=verbose`, 'Running all tests with verbose output');
       break;
+    }
     default:
       console.log('Available commands:');
       console.log('  unit     - Run unit tests once');
@@ -94,9 +100,6 @@ function main() {
   }
 }
 
-if (require.main === module) {
-  main();
-}
+main();
 
 export { runCommand, checkTestFiles, TEST_COMMANDS, TEST_PATTERNS };
-

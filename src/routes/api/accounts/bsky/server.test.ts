@@ -44,7 +44,12 @@ describe('/api/accounts/bsky/+server', () => {
       expect(response.headers.get('Content-Type')).toBe('application/json');
 
       const data = await response.json();
-      expect(data).toEqual(mockAccounts);
+      expect(data && typeof data).toBe('object');
+      expect(data.platform).toBe('bsky');
+      expect(typeof data.generatedAt).toBe('string');
+      expect(data.count).toBe(mockAccounts.length);
+      expect(Array.isArray(data.accounts)).toBe(true);
+      expect(data.accounts).toEqual(mockAccounts);
     });
 
     it('should handle empty accounts list', async () => {
@@ -56,21 +61,24 @@ describe('/api/accounts/bsky/+server', () => {
       expect(response.status).toBe(200);
       
       const data = await response.json();
-      expect(data).toEqual([]);
+      expect(data && typeof data).toBe('object');
+      expect(data.platform).toBe('bsky');
+      expect(typeof data.generatedAt).toBe('string');
+      expect(data.count).toBe(0);
+      expect(Array.isArray(data.accounts)).toBe(true);
+      expect(data.accounts).toEqual([]);
     });
 
     it('should handle service errors', async () => {
       mockGetAccountsSnapshot.mockRejectedValue(new Error('Service unavailable'));
 
       const request = new Request('http://localhost/api/accounts/bsky');
-      
-      try {
-        await GET({ request } as any);
-        // If no error is thrown, the handler should handle it gracefully
-      } catch (error) {
-        expect(error).toBeInstanceOf(Error);
-        expect((error as Error).message).toBe('Service unavailable');
-      }
+      const response = await GET({ request } as any);
+
+      expect(response.status).toBe(500);
+      const data = await response.json();
+      expect(data && typeof data).toBe('object');
+      expect(data.error).toBe('failed_to_list_accounts');
     });
 
     it('should return correct JSON structure', async () => {
@@ -107,12 +115,14 @@ describe('/api/accounts/bsky/+server', () => {
       const response = await GET({ request } as any);
 
       const data = await response.json();
-      
-      expect(Array.isArray(data)).toBe(true);
-      expect(data).toHaveLength(2);
+      expect(data && typeof data).toBe('object');
+      expect(data.platform).toBe('bsky');
+      expect(typeof data.generatedAt).toBe('string');
+      expect(Array.isArray(data.accounts)).toBe(true);
+      expect(data.accounts).toHaveLength(2);
       
       // Verify structure of each account
-      data.forEach((account: any) => {
+      data.accounts.forEach((account: any) => {
         expect(account).toHaveProperty('did');
         expect(account).toHaveProperty('handle');
         expect(account).toHaveProperty('displayName');
@@ -150,10 +160,10 @@ describe('/api/accounts/bsky/+server', () => {
       expect(response.status).toBe(200);
       
       const data = await response.json();
-      expect(data[0].displayName).toBeNull();
-      expect(data[0].followersCount).toBeUndefined();
-      expect(data[0].createdAt).toBeNull();
+      expect(Array.isArray(data.accounts)).toBe(true);
+      expect(data.accounts[0].displayName).toBeNull();
+      expect(data.accounts[0].followersCount).toBeUndefined();
+      expect(data.accounts[0].createdAt).toBeNull();
     });
   });
 });
-

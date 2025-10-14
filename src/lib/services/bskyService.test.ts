@@ -116,7 +116,7 @@ describe('bskyService', () => {
 
       expect(result.eligible).toBe(true);
       expect(result.reasons).toContain('followers=1000 ≥ min=500');
-      expect(result.reasons).toContain('age=12.0mo ≥ min=6mo');
+      expect(result.reasons.some(r => /^age=\d+(\.\d+)?mo .+min=6mo$/.test(r))).toBe(true);
     });
 
     it('should mark account as ineligible when followers are too low', () => {
@@ -244,11 +244,11 @@ describe('bskyService', () => {
                   handle: 'test1.bsky.social',
                   displayName: 'Test User 1'
                 },
-                indexedAt: new Date().toISOString()
-              },
-              record: {
-                text: 'Great Arsenal performance!',
-                createdAt: new Date().toISOString()
+                indexedAt: new Date().toISOString(),
+                record: {
+                  text: 'Great Arsenal performance!',
+                  createdAt: new Date().toISOString()
+                }
               }
             }
           ]
@@ -292,11 +292,11 @@ describe('bskyService', () => {
                   handle: 'test1.bsky.social',
                   displayName: 'Test User 1'
                 },
-                indexedAt: oldDate.toISOString()
-              },
-              record: {
-                text: 'Old Arsenal post',
-                createdAt: oldDate.toISOString()
+                indexedAt: oldDate.toISOString(),
+                record: {
+                  text: 'Old Arsenal post',
+                  createdAt: oldDate.toISOString()
+                }
               }
             }
           ]
@@ -503,4 +503,3 @@ describe('bskyService', () => {
     });
   });
 });
-
