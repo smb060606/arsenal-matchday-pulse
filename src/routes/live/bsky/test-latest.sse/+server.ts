@@ -15,39 +15,51 @@ export const GET: RequestHandler = async ({ setHeaders, url }) => {
 
   // Use an indicative matchId for testing; caller can override with ?matchId=foo
   const matchId = url.searchParams.get('matchId') ?? 'latest-finished-test';
-  const intervalSec = Number(url.searchParams.get('intervalSec') ?? 10);
-  const sinceMin = Number(url.searchParams.get('sinceMin') ?? 180);
+  const nInterval = Number(url.searchParams.get('intervalSec'));
+  const intervalSec = Math.max(1, Number.isFinite(nInterval) && nInterval > 0 ? nInterval : 10);
+  const nSince = Number(url.searchParams.get('sinceMin'));
+  const sinceMin = Number.isFinite(nSince) && nSince > 0 ? nSince : 180;
 
   const encoder = new TextEncoder();
+  let stopped = false;
+  let closer: ReturnType<typeof setTimeout> | null = null;
 
   const stream = new ReadableStream({
     start(controller) {
       controller.enqueue(encoder.encode(': test post-match stream start\n\n'));
 
       let tick = 0;
-      const iv = setInterval(async () => {
-        try {
-          const payload = await buildTick(matchId, 'post', tick++, sinceMin);
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
-        } catch (e) {
-          const err = { message: 'tick_failed' };
-          controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify(err)}\n\n`));
+
+      const loop = async () => {
+        while (!stopped) {
+          try {
+            const payload = await buildTick(matchId, 'post', tick++, sinceMin);
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+          } catch (e) {
+            const err = { message: 'tick_failed' };
+            controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify(err)}\n\n`));
+          }
+          await new Promise((r) => setTimeout(r, intervalSec * 1000));
         }
-      }, Math.max(1, intervalSec) * 1000);
+      };
+
+      loop().catch(() => {
+        try { controller.close(); } catch {}
+      });
 
       // Close after 10 minutes by default; client can reconnect
-      const closer = setTimeout(() => {
-        clearInterval(iv);
+      closer = setTimeout(() => {
+        stopped = true;
         controller.close();
       }, 10 * 60 * 1000);
-
-      // Optional cancellation support
-      // @ts-ignore
-      controller.signal?.addEventListener?.('abort', () => {
-        clearInterval(iv);
+    },
+    cancel() {
+      // Proper cancellation and cleanup
+      stopped = true;
+      if (closer) {
         clearTimeout(closer);
-        controller.close();
-      });
+        closer = null;
+      }
     }
   });
 

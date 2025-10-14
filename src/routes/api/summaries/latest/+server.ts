@@ -1,8 +1,14 @@
-import type { RequestHandler } from './$types';
+import type { RequestHandler } from '@sveltejs/kit';
 import OpenAI from 'openai';
 import { buildTick } from '$lib/services/bskyService';
 import { DEFAULT_RECENCY_MINUTES } from '$lib/config/bsky';
 import { selectEligibleAccounts, fetchRecentPostsForAccounts } from '$lib/services/bskyService';
+
+// Simple in-memory rate limiter for cost protection
+let SUMMARY_REQ_TIMESTAMPS: number[] = [];
+const RATE_WINDOW_MS = Number(process.env.SUMMARIES_RATE_WINDOW_MS ?? 60_000); // 1 minute
+const RATE_MAX = Number(process.env.SUMMARIES_RATE_MAX ?? 4); // max requests per window
+const SUMMARY_TIMEOUT_MS_DEFAULT = Number(process.env.SUMMARIES_TIMEOUT_MS ?? 15_000);
 
 // Utility: safely read env
 function env(name: string, fallback?: string) {
@@ -54,6 +60,24 @@ export const GET: RequestHandler = async ({ url }) => {
 
     // Truncate by total chars to keep prompt bounded
     let joined = texts.join('\n');
+
+    // Rate limiting (global, in-memory)
+    const now = Date.now();
+    SUMMARY_REQ_TIMESTAMPS = SUMMARY_REQ_TIMESTAMPS.filter((ts) => now - ts < RATE_WINDOW_MS);
+    if (SUMMARY_REQ_TIMESTAMPS.length >= RATE_MAX) {
+      const retryAfterMs = RATE_WINDOW_MS - (now - SUMMARY_REQ_TIMESTAMPS[0]);
+      return new Response(
+        JSON.stringify({ error: 'rate_limited', retryAfterMs }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': Math.ceil(retryAfterMs / 1000).toString()
+          }
+        }
+      );
+    }
+    SUMMARY_REQ_TIMESTAMPS.push(now);
     if (joined.length > MAX_CHARS) {
       joined = joined.slice(0, MAX_CHARS);
     }
@@ -75,7 +99,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
     const system = [
       'You are an assistant summarizing Arsenal fan sentiment.',
-      'Summarize the following social posts from the last 15 minutes into no more than 3 concise paragraphs.',
+      `Summarize the following social posts from the last ${sinceMin} minutes into no more than 3 concise paragraphs.`,
       'Focus on:',
       '- Overall sentiment (positive/negative/mixed) and intensity',
       '- Key topics (players, manager, refereeing, tactics)',
@@ -87,15 +111,44 @@ export const GET: RequestHandler = async ({ url }) => {
     const prompt = `${userPromptHeader}${joined}`;
 
     // Use chat completion API
-    const completion = await client.chat.completions.create({
-      model: OPENAI_MODEL!,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.5,
-      max_tokens: 600
-    });
+    // Timeout and abort handling for OpenAI call
+    const timeoutMs = Number.isFinite(Number(process.env.SUMMARIES_TIMEOUT_MS))
+      ? Number(process.env.SUMMARIES_TIMEOUT_MS)
+      : SUMMARY_TIMEOUT_MS_DEFAULT;
+    const ac = new AbortController();
+    const timeoutId = setTimeout(() => {
+      try {
+        ac.abort(new Error('timeout'));
+      } catch {
+        // ignore abort errors
+      }
+    }, timeoutMs);
+
+    let completion: any;
+    try {
+      completion = await client.chat.completions.create(
+        {
+          model: OPENAI_MODEL!,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.5,
+          max_tokens: 600
+        },
+        { signal: ac.signal, timeout: timeoutMs }
+      );
+    } catch (err: any) {
+      if (err?.name === 'AbortError' || err?.message === 'timeout') {
+        return new Response(
+          JSON.stringify({ error: 'openai_timeout', timeoutMs }),
+          { status: 504, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     const content = completion.choices?.[0]?.message?.content ?? '';
     const usage = (completion as any)?.usage ?? {};
