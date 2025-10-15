@@ -150,3 +150,43 @@ Next Phase (WIP): Comments persistence to Supabase (feat/comments-persistence)
   - Enforced by CLINE_RULES.md and package.json/vite.config.ts:
     - Always use http://localhost:5173
     - StrictPort enabled (no automatic fallback)
+
+Next Phase (WIP): Budget Planner under $50/platform (feat/budget-planner)
+- Summary of changes
+  - Platform budget config (env-driven): src/lib/config/budget.ts
+    - BUDGET_PER_PLATFORM_DOLLARS (default 50)
+    - BSKY_COST_PER_MONTH_DOLLARS (default 0)
+    - TWITTER_COST_PER_MONTH_DOLLARS (optional; if unset, unconfigured)
+    - THREADS_COST_PER_MONTH_DOLLARS (optional; if unset, unconfigured)
+  - Planner API:
+    - GET /api/accounts/plan → returns per-platform plan with budget, cost, and selection
+      - Bluesky: uses AppView reads (treated as $0) and selects up to BSKY_MAX_ACCOUNTS from allowlist eligibility
+      - Twitter/Threads: remain “unconfigured” unless env cost is provided (to avoid accidental spend)
+  - UI:
+    - /accounts/plan route with page and loader:
+      - src/routes/accounts/plan/+page.ts
+      - src/routes/accounts/plan/+page.svelte
+    - Displays per-platform budget, cost, status, and for Bluesky the selected accounts list with eligibility reasons
+
+- Environment variables (add to .env)
+  - BUDGET_PER_PLATFORM_DOLLARS="50"
+  - BSKY_COST_PER_MONTH_DOLLARS="0"
+  - TWITTER_COST_PER_MONTH_DOLLARS=""  # set to enable planner for X/Twitter
+  - THREADS_COST_PER_MONTH_DOLLARS=""  # set to enable planner for Threads
+
+- Endpoint usage
+  - GET /api/accounts/plan
+    - Response:
+      {
+        "generatedAt": "...",
+        "budgetPerPlatformDollars": 50,
+        "platforms": {
+          "bsky": { "status": "ok", "costPerMonthDollars": 0, "maxAccountsAllowed": N, "selected": [ ... ] },
+          "twitter": { "status": "unconfigured", "costPerMonthDollars": null },
+          "threads": { "status": "unconfigured", "costPerMonthDollars": null }
+        }
+      }
+
+- Notes
+  - Bluesky is safe within budget due to $0 cost assumption for public AppView reads.
+  - Twitter/Threads integration is intentionally gated by env cost values to prevent exceeding the $50/month per platform budget without explicit configuration.
