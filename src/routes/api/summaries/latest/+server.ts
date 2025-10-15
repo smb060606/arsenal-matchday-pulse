@@ -1,8 +1,8 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import OpenAI from 'openai';
-import { buildTick } from '$lib/services/bskyService';
 import { DEFAULT_RECENCY_MINUTES } from '$lib/config/bsky';
 import { selectEligibleAccounts, fetchRecentPostsForAccounts } from '$lib/services/bskyService';
+import { getWindowState, DEFAULT_LIVE_DURATION_MIN } from '$lib/utils/matchWindow';
 
 // Simple in-memory rate limiter for cost protection
 let SUMMARY_REQ_TIMESTAMPS: number[] = [];
@@ -38,14 +38,21 @@ export const GET: RequestHandler = async ({ url }) => {
     const platform = normalizePlatform(url.searchParams.get('platform'));
     const sinceMin = Number(url.searchParams.get('sinceMin') ?? DEFAULT_WINDOW_MIN);
 
+    const kickoffISO = url.searchParams.get('kickoff') ?? '';
+    const liveMinParam = Number(url.searchParams.get('liveMin'));
+    const liveDurationMin = Number.isFinite(liveMinParam) && liveMinParam > 0 ? liveMinParam : DEFAULT_LIVE_DURATION_MIN;
+    const currentWindow = kickoffISO ? getWindowState({ kickoffISO, liveDurationMin }) : 'live';
+
     // Prepare posts according to platform. For now:
     // - bsky: gather from Bluesky allowlisted eligible accounts
     // - combined: use bsky until X/Threads are implemented
     // - twitter/threads: TODO (future PRs)
     let texts: string[] = [];
+    let accountsUsed: Array<{ did: string; handle: string; displayName?: string }> = [];
 
     if (platform === 'bsky' || platform === 'combined') {
       const accounts = await selectEligibleAccounts();
+      accountsUsed = accounts.map((a) => ({ did: a.profile.did, handle: a.profile.handle, displayName: a.profile.displayName }));
       const posts = await fetchRecentPostsForAccounts(accounts, sinceMin);
       texts = posts
         .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
@@ -99,6 +106,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
     const system = [
       'You are an assistant summarizing Arsenal fan sentiment.',
+      `This summary is for the ${currentWindow.toUpperCase()} phase (pre-match/live/post-match).`,
       `Summarize the following social posts from the last ${sinceMin} minutes into no more than 3 concise paragraphs.`,
       'Focus on:',
       '- Overall sentiment (positive/negative/mixed) and intensity',
@@ -107,7 +115,7 @@ export const GET: RequestHandler = async ({ url }) => {
       'Avoid quoting individual users; avoid personal data; keep it neutral and aggregate-focused.'
     ].join('\n');
 
-    const userPromptHeader = `Match: ${matchId}\nPlatform: ${platform}\nTime window: last ${sinceMin} minutes\nPosts:\n`;
+    const userPromptHeader = `Match: ${matchId}\nPlatform: ${platform}\nPhase: ${currentWindow}\nTime window: last ${sinceMin} minutes\nPosts:\n`;
     const prompt = `${userPromptHeader}${joined}`;
 
     // Use chat completion API
@@ -156,7 +164,9 @@ export const GET: RequestHandler = async ({ url }) => {
     const response = {
       matchId,
       platform,
+      window: currentWindow,
       windowMinutes: sinceMin,
+      accountsUsed,
       model: OPENAI_MODEL,
       summary: content,
       usage

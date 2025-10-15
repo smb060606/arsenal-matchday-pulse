@@ -85,6 +85,7 @@
   let summaryLoading = false;
   let summaryError: string | null = null;
   let summaryText: string | null = null;
+  let summaryMeta: { window?: string; accountsUsed?: Array<{ did: string; handle: string; displayName?: string }> } | null = null;
   let summaryPlatform: 'combined' | 'bsky' | 'twitter' | 'threads' = 'combined';
   let windowMinutes = 15;
 
@@ -96,7 +97,9 @@
       const res = await fetch(
         `/api/summaries/latest?matchId=${encodeURIComponent(matchId)}&platform=${encodeURIComponent(
           summaryPlatform
-        )}&sinceMin=${encodeURIComponent(String(windowMinutes))}`
+        )}&sinceMin=${encodeURIComponent(String(windowMinutes))}&kickoff=${encodeURIComponent(
+          data.kickoff || ''
+        )}&liveMin=${encodeURIComponent(String(data.liveMin))}`
       );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -104,6 +107,10 @@
       }
       const payload = await res.json();
       summaryText = payload?.summary || '(No summary generated yet)';
+      summaryMeta = {
+        window: payload?.window,
+        accountsUsed: Array.isArray(payload?.accountsUsed) ? payload.accountsUsed : undefined
+      };
     } catch (e: any) {
       summaryError = e?.message || 'Failed to load summary';
     } finally {
@@ -249,6 +256,14 @@
           <div class="text-gray-500">No summary available yet. Try again later.</div>
         {/if}
       </div>
+      {#if summaryMeta}
+        <div class="muted" style="margin-top:0.5rem;">
+          Phase: <strong>{summaryMeta.window ? summaryMeta.window.toUpperCase() : 'N/A'}</strong>
+          {#if summaryMeta.accountsUsed?.length}
+            • Accounts used: {summaryMeta.accountsUsed.length}
+          {/if}
+        </div>
+      {/if}
       <div class="text-xs text-gray-500">
         Summaries are generated from recent posts in the specified window. Content is aggregate-only and avoids personal data.
       </div>
