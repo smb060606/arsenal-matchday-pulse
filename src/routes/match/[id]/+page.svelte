@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { getLiveBin } from '$lib/utils/matchWindow';
   export let data: {
     matchId: string;
     kickoff: string;
@@ -47,9 +48,13 @@
   onMount(() => {
     esB = connect('bsky');
     // esT = connect('twitter');
+    // keep live bin label reasonably fresh
+    updateLiveBinLabel();
+    const t = setInterval(updateLiveBinLabel, 30000);
     return () => {
       esB?.close();
       // esT?.close();
+      clearInterval(t);
     };
   });
 
@@ -85,22 +90,33 @@
   let summaryLoading = false;
   let summaryError: string | null = null;
   let summaryText: string | null = null;
-  let summaryMeta: { window?: string; accountsUsed?: Array<{ did: string; handle: string; displayName?: string }> } | null = null;
+  let summaryMeta: { phase?: string; accountsUsed?: Array<{ did: string; handle: string; displayName?: string }>; liveBin?: { index: number; startMinute: number; endMinute: number } } | null = null;
   let summaryPlatform: 'combined' | 'bsky' | 'twitter' | 'threads' = 'combined';
-  let windowMinutes = 15;
 
-  async function loadSummary() {
+  // Live bin label (e.g., "15–30") computed from kickoff; updates periodically
+  let liveBinLabel: string = '';
+  function updateLiveBinLabel() {
+    if (!data.kickoff) {
+      liveBinLabel = '';
+      return;
+    }
+    const bin = getLiveBin(data.kickoff, Date.now());
+    liveBinLabel = `${bin.startMinute}–${bin.endMinute}`;
+  }
+
+  async function loadSummary(phase: 'pre' | 'live' | 'post') {
     summaryLoading = true;
     summaryError = null;
     summaryText = null;
     try {
-      const res = await fetch(
-        `/api/summaries/latest?matchId=${encodeURIComponent(matchId)}&platform=${encodeURIComponent(
-          summaryPlatform
-        )}&sinceMin=${encodeURIComponent(String(windowMinutes))}&kickoff=${encodeURIComponent(
-          data.kickoff || ''
-        )}&liveMin=${encodeURIComponent(String(data.liveMin))}`
-      );
+      const qs = new URLSearchParams({
+        matchId,
+        platform: summaryPlatform,
+        kickoff: data.kickoff || '',
+        liveMin: String(data.liveMin),
+        mode: phase
+      });
+      const res = await fetch(`/api/summaries/latest?${qs.toString()}`);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err?.message || `Request failed: ${res.status}`);
@@ -108,8 +124,9 @@
       const payload = await res.json();
       summaryText = payload?.summary || '(No summary generated yet)';
       summaryMeta = {
-        window: payload?.window,
-        accountsUsed: Array.isArray(payload?.accountsUsed) ? payload.accountsUsed : undefined
+        phase: payload?.phase,
+        accountsUsed: Array.isArray(payload?.accountsUsed) ? payload.accountsUsed : undefined,
+        liveBin: payload?.liveBin ?? null
       };
     } catch (e: any) {
       summaryError = e?.message || 'Failed to load summary';
@@ -229,7 +246,16 @@
 
   <div class="card" style="margin-top:1rem;">
     <div class="flex items-center justify-between">
-      <h2>AI Summary (last {windowMinutes} minutes)</h2>
+      <h2>
+        AI Summary
+        {#if active === 'live' && liveBinLabel}
+          <span class="muted">(current bin {liveBinLabel} min)</span>
+        {:else if active === 'pre'}
+          <span class="muted">(full pre-match window)</span>
+        {:else if active === 'post'}
+          <span class="muted">(full post-match window)</span>
+        {/if}
+      </h2>
       <div class="flex items-center gap-2">
         <label class="text-sm text-gray-600">Platform</label>
         <select bind:value={summaryPlatform} class="border rounded px-2 py-1 text-sm">
@@ -238,9 +264,11 @@
           <option value="twitter">Twitter</option>
           <option value="threads">Threads</option>
         </select>
-        <label class="text-sm text-gray-600">Window (min)</label>
-        <input class="border rounded px-2 py-1 w-20 text-sm" type="number" min="5" max="60" step="5" bind:value={windowMinutes} />
-        <button class="px-3 py-1 rounded border bg-gray-50 hover:bg-gray-100" on:click={() => { summaryOpen = true; void loadSummary(); }} disabled={summaryLoading}>
+        <button
+          class="px-3 py-1 rounded border bg-gray-50 hover:bg-gray-100"
+          on:click={() => { summaryOpen = true; void loadSummary(active); }}
+          disabled={summaryLoading}
+        >
           {summaryLoading ? 'Loading...' : 'View AI Summary'}
         </button>
       </div>
@@ -258,7 +286,10 @@
       </div>
       {#if summaryMeta}
         <div class="muted" style="margin-top:0.5rem;">
-          Phase: <strong>{summaryMeta.window ? summaryMeta.window.toUpperCase() : 'N/A'}</strong>
+          Phase: <strong>{summaryMeta.phase ? summaryMeta.phase.toUpperCase() : 'N/A'}</strong>
+          {#if summaryMeta.liveBin}
+            • Bin: {summaryMeta.liveBin.startMinute}–{summaryMeta.liveBin.endMinute}
+          {/if}
           {#if summaryMeta.accountsUsed?.length}
             • Accounts used: {summaryMeta.accountsUsed.length}
           {/if}
