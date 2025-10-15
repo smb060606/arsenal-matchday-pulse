@@ -24,8 +24,22 @@ type PlatformPlan = {
   }>;
 };
 
-export const GET: RequestHandler = async () => {
+export const GET: RequestHandler = async ({ request }) => {
   try {
+    // Admin-only guard: require ADMIN_SECRET via header
+    const adminSecret = process.env.ADMIN_SECRET;
+    if (!adminSecret) {
+      return new Response(JSON.stringify({ error: 'admin_not_configured' }), {
+        status: 501,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    const token = request.headers.get('x-admin-token') ?? '';
+    if (token !== adminSecret) {
+      // Hide existence from public
+      return new Response('Not found', { status: 404 });
+    }
+
     const generatedAt = new Date().toISOString();
     const budget = BUDGET_PER_PLATFORM_DOLLARS;
 
