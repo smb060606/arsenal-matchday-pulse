@@ -8,7 +8,7 @@
   },
   "scripts": {
     "predev": "echo skip svelte-kit sync",
-    "dev": "vite dev",
+    "dev": "vite dev --port 5173 --strictPort",
     "build": "vite build",
     "preview": "svelte-kit preview --port 4173 --host",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -34,11 +34,11 @@
     "@vitest/coverage-v8": "^1.6.1",
     "@vitest/ui": "^1.6.1",
     "jsdom": "^25.0.1",
-    "svelte": "^5.39.12",
+    "svelte": "^5.40.0",
     "svelte-check": "^4.3.3",
     "tslib": "^2.8.1",
     "typescript": "^5.9.3",
-    "vite": "^6.3.6",
+    "vite": "^6.3.7",
     "vitest": "^1.6.1"
   }
 }
