@@ -1,4 +1,5 @@
 import type { RequestHandler } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 import { BUDGET_PER_PLATFORM_DOLLARS, getPlatformCostConfig } from '$lib/config/budget';
 import { getAccountsSnapshot } from '$lib/services/bskyService';
 import { BSKY_MAX_ACCOUNTS } from '$lib/config/bsky';
@@ -27,7 +28,7 @@ type PlatformPlan = {
 export const GET: RequestHandler = async ({ request }) => {
   try {
     // Admin-only guard: require ADMIN_SECRET via header
-    const adminSecret = process.env.ADMIN_SECRET;
+    const adminSecret = env.ADMIN_SECRET;
     if (!adminSecret) {
       return new Response(JSON.stringify({ error: 'admin_not_configured' }), {
         status: 501,
