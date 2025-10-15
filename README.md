@@ -91,3 +91,62 @@ Notes
 Testing added for this checkpoint
 - Unit tests (see src/routes/api/auth/bsky/**/server.test.ts, src/routes/api/comments/server.test.ts, and src/lib/auth/bskyVerifyStore.test.ts)
 - Runner supports pattern filtering via npm run test:run [command] [pattern] (e.g., npm run test:run unit routes)
+
+Next Phase (WIP): Comments persistence to Supabase (feat/comments-persistence)
+- Summary of changes
+  - Server-side Supabase admin client (service role): src/lib/supabaseAdmin.ts
+  - Shared types: src/lib/types/comment.ts
+  - Comments API now persists to Supabase with in-memory fallback:
+    - src/routes/api/comments/+server.ts (GET/POST)
+  - Moderation endpoint (server-gated via ADMIN_SECRET and service role):
+    - POST src/routes/api/comments/moderate/+server.ts
+  - SQL migration for comments table with RLS:
+    - supabase/migrations/001_create_comments.sql
+  - Example environment file:
+    - .env.example
+
+- Setup instructions
+  1) Copy env file
+     - cp .env.example .env
+     - Set:
+       - PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY
+       - SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (server-only)
+       - ADMIN_SECRET (random strong string for moderation endpoint)
+  2) Apply the SQL migration
+     - Option A: Supabase SQL Editor
+       - Open your project → SQL → paste supabase/migrations/001_create_comments.sql → Run
+     - Option B: Supabase CLI (if configured)
+       - supabase db push  (ensure the CLI is connected to your project)
+  3) Restart dev server (port policy)
+     - npm run dev (project is configured to run at http://localhost:5173 and fail if occupied; see CLINE_RULES.md)
+
+- Endpoint usage
+  - List comments
+    - GET /api/comments?matchId=2025-10-19-CHE-ARS
+  - Post comment
+    - POST /api/comments
+      {
+        "matchId": "2025-10-19-CHE-ARS",
+        "text": "COYG! That press is on fire.",
+        "platform": "combined",
+        "parentId": null,
+        "user": {"id":"u1","handle":"@gooner","displayName":"Gooner"}
+      }
+  - Moderate (delete) comment
+    - POST /api/comments/moderate
+      Headers: x-admin-token: $ADMIN_SECRET
+      Body: { "id": "COMMENT_UUID" }
+
+- Fallback behavior
+  - If Supabase is not configured or the DB call fails, the API uses an in-memory map (per process) to store/read comments so local dev can continue.
+
+- Security notes
+  - Do NOT expose SUPABASE_SERVICE_ROLE_KEY to the browser.
+  - The moderation endpoint requires the ADMIN_SECRET header and runs only on the server using the service role.
+  - RLS policies allow selects of active comments and open inserts; updates/deletes are restricted to service role for moderation.
+  - Consider adding per-user rate limiting and spam protections in a future phase.
+
+- Dev server port policy
+  - Enforced by CLINE_RULES.md and package.json/vite.config.ts:
+    - Always use http://localhost:5173
+    - StrictPort enabled (no automatic fallback)
