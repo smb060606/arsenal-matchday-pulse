@@ -12,6 +12,7 @@
   const matchId = data.matchId;
   let active: 'pre' | 'live' | 'post' = data.currentWindow;
   let messages: string[] = [];
+  let accountsUsedLive: Array<{ did?: string; handle: string; displayName?: string }> = [];
 
   // Build SSE URL with kickoff and timing to enforce windows
   function sseUrl(platform: 'bsky' | 'twitter') {
@@ -36,6 +37,19 @@
     });
     es.onmessage = (ev) => {
       messages = [`${platform.toUpperCase()} :: ${ev.data}`, ...messages].slice(0, 200);
+      // Attempt to parse payload and extract live accounts list (for Bluesky transparency)
+      try {
+        const payload = JSON.parse(ev.data);
+        if (payload && payload.platform === 'bsky' && Array.isArray(payload.accountsUsed)) {
+          accountsUsedLive = payload.accountsUsed.map((a: any) => ({
+            did: a?.did,
+            handle: a?.handle,
+            displayName: a?.displayName
+          }));
+        }
+      } catch {
+        // Non-JSON message; ignore
+      }
     };
     es.onerror = () => es.close();
     return es;
@@ -174,6 +188,17 @@
           <li class="muted">Waiting for live ticks...</li>
         {/if}
       </ul>
+
+      {#if accountsUsedLive.length}
+        <div style="margin-top:0.5rem;">
+          <h3>Accounts Used (Live) ({accountsUsedLive.length})</h3>
+          <div class="chips">
+            {#each accountsUsedLive as a}
+              <span class="chip">@{a.handle}{a.displayName ? ` (${a.displayName})` : ''}</span>
+            {/each}
+          </div>
+        </div>
+      {/if}
     </div>
   {/if}
 
