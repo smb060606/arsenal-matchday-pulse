@@ -25,6 +25,23 @@
       createdAt?: string | null;
       eligibility: { eligible: boolean; reasons: string[] };
     }>;
+    overrides?: {
+      include: Array<{
+        identifier: string;
+        identifier_type: 'did' | 'handle' | 'user_id';
+        scope: 'global' | 'match';
+        match_id: string | null;
+        bypass_eligibility: boolean;
+        expires_at: string | null;
+      }>;
+      exclude: Array<{
+        identifier: string;
+        identifier_type: 'did' | 'handle' | 'user_id';
+        scope: 'global' | 'match';
+        match_id: string | null;
+        expires_at: string | null;
+      }>;
+    };
   };
 
   const { platforms, budgetPerPlatformDollars, generatedAt } = data;
@@ -157,6 +174,41 @@
         </div>
       {:else}
         <div class="muted" style="margin-top:0.5rem;">No accounts selected or not configured.</div>
+      {/if}
+
+      {#if platforms.bsky.overrides}
+        <div class="list" style="margin-top:0.75rem;">
+          <h3>Overrides</h3>
+          <div class="hstack">
+            <div class="chip">Includes: {platforms.bsky.overrides.include?.length ?? 0}</div>
+            <div class="chip">Excludes: {platforms.bsky.overrides.exclude?.length ?? 0}</div>
+          </div>
+
+          {#if (platforms.bsky.overrides.include?.length ?? 0) > 0}
+            <div class="chips" style="margin-top:0.35rem;">
+              {#each platforms.bsky.overrides.include as o}
+                <span class="chip">
+                  + {o.identifier}
+                  {#if o.scope === 'match'} (match: {o.match_id}){/if}
+                  {#if o.bypass_eligibility} • bypass{/if}
+                  {#if o.expires_at} • exp: {new Date(o.expires_at).toLocaleDateString()}{/if}
+                </span>
+              {/each}
+            </div>
+          {/if}
+
+          {#if (platforms.bsky.overrides.exclude?.length ?? 0) > 0}
+            <div class="chips" style="margin-top:0.35rem;">
+              {#each platforms.bsky.overrides.exclude as o}
+                <span class="chip">
+                  − {o.identifier}
+                  {#if o.scope === 'match'} (match: {o.match_id}){/if}
+                  {#if o.expires_at} • exp: {new Date(o.expires_at).toLocaleDateString()}{/if}
+                </span>
+              {/each}
+            </div>
+          {/if}
+        </div>
       {/if}
     </div>
 

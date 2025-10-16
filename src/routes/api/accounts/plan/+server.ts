@@ -3,6 +3,7 @@ import { env } from '$env/dynamic/private';
 import { BUDGET_PER_PLATFORM_DOLLARS, getPlatformCostConfig } from '$lib/config/budget';
 import { getAccountsSnapshot } from '$lib/services/bskyService';
 import { BSKY_MAX_ACCOUNTS } from '$lib/config/bsky';
+import { getOverrides } from '$lib/services/accountOverrides';
 
 type PlatformPlan = {
   platform: 'bsky' | 'twitter' | 'threads';
@@ -23,6 +24,23 @@ type PlatformPlan = {
       reasons: string[];
     };
   }>;
+  overrides?: {
+    include: Array<{
+      identifier: string;
+      identifier_type: 'did' | 'handle' | 'user_id';
+      scope: 'global' | 'match';
+      match_id: string | null;
+      bypass_eligibility: boolean;
+      expires_at: string | null;
+    }>;
+    exclude: Array<{
+      identifier: string;
+      identifier_type: 'did' | 'handle' | 'user_id';
+      scope: 'global' | 'match';
+      match_id: string | null;
+      expires_at: string | null;
+    }>;
+  };
 };
 
 export const GET: RequestHandler = async ({ request }) => {
@@ -60,6 +78,26 @@ export const GET: RequestHandler = async ({ request }) => {
       const maxAllowed = Math.max(0, BSKY_MAX_ACCOUNTS);
       bskyPlan.maxAccountsAllowed = maxAllowed;
       bskyPlan.selected = (accounts ?? []).slice(0, maxAllowed);
+
+      // Attach override summary for transparency (gracefully empty if admin env missing)
+      const ov = await getOverrides({ platform: 'bsky' }).catch(() => ({ include: [], exclude: [] }));
+      bskyPlan.overrides = {
+        include: (ov.include || []).map((o) => ({
+          identifier: o.identifier,
+          identifier_type: o.identifier_type,
+          scope: o.scope,
+          match_id: o.match_id,
+          bypass_eligibility: o.bypass_eligibility,
+          expires_at: o.expires_at
+        })),
+        exclude: (ov.exclude || []).map((o) => ({
+          identifier: o.identifier,
+          identifier_type: o.identifier_type,
+          scope: o.scope,
+          match_id: o.match_id,
+          expires_at: o.expires_at
+        }))
+      };
     }
 
     // Twitter/X
