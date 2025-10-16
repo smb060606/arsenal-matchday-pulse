@@ -4,6 +4,7 @@
     { href: "/accounts/bsky", label: "Accounts (Bluesky)" },
     { href: "/accounts/twitter", label: "Accounts (Twitter)" },
     { href: "/compare/demo", label: "Compare View (Demo)" },
+    { href: "/history/demo?platform=bsky&phase=all", label: "Summaries History (Demo)" },
     { href: "/methodology", label: "Methodology" }
   ];
 </script>
