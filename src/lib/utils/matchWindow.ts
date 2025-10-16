@@ -78,16 +78,27 @@ export function getLiveBin(kickoffISO: string, nowMs: number = Date.now(), halft
   endMinute: number;       // 15,30,45,60,75,90
   binStartMs: number;      // wall-clock ms for start of bin
 } {
+  const kickoff = Date.parse(kickoffISO);
+  const elapsedRealMin = Number.isFinite(kickoff) ? Math.max(0, (nowMs - kickoff) / 60_000) : 0;
+
   const mm = effectiveMatchMinute(kickoffISO, nowMs, halftimeMin);
   let index = Math.floor(mm / 15);
+
+  // Halftime collapse rule: keep mm=45 in the 30–45 bin until second half actually resumes
+  if (mm === 45 && elapsedRealMin <= 45 + halftimeMin) {
+    index = 2; // 30–45
+  }
+
   if (index < 0) index = 0;
   if (index > 5) index = 5;
+
   const startMinute = [0, 15, 30, 45, 60, 75][index];
   const endMinute = [15, 30, 45, 60, 75, 90][index];
+
   // Convert start match minute to wall-clock ms
-  const kickoff = Date.parse(kickoffISO);
   const elapsedStartMin = mapMatchMinuteToElapsedMinutes(startMinute, halftimeMin);
-  const binStartMs = kickoff + elapsedStartMin * 60_000;
+  const binStartMs = (Number.isFinite(kickoff) ? kickoff : Date.now()) + elapsedStartMin * 60_000;
+
   return { index, startMinute, endMinute, binStartMs };
 }
 

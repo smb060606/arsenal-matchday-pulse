@@ -29,7 +29,11 @@ const mockAgent = {
   getAuthorFeed: vi.fn()
 };
 
-vi.mocked(BskyAgent).mockImplementation(() => mockAgent as any);
+vi.mock('@atproto/api', () => {
+  return {
+    BskyAgent: vi.fn().mockImplementation(() => mockAgent as any)
+  };
+});
 
 describe('bskyService', () => {
   beforeEach(() => {

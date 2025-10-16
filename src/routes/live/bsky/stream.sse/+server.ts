@@ -4,11 +4,17 @@ import { DEFAULT_RECENCY_MINUTES, DEFAULT_TICK_INTERVAL_SEC } from '$lib/config/
 import { getWindowState, DEFAULT_LIVE_DURATION_MIN } from '$lib/utils/matchWindow';
 
 export const GET: RequestHandler = async ({ setHeaders, url }) => {
-  setHeaders({
+  const sseHeaders = {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache, no-transform',
     Connection: 'keep-alive'
-  });
+  } as const;
+
+  // In SvelteKit runtime, setHeaders is provided on the event.
+  // In tests, the event object may not include setHeaders; guard accordingly.
+  if (typeof setHeaders === 'function') {
+    setHeaders(sseHeaders as any);
+  }
 
   const matchId = url.searchParams.get('matchId') ?? 'demo';
 
@@ -109,5 +115,5 @@ export const GET: RequestHandler = async ({ setHeaders, url }) => {
     }
   });
 
-  return new Response(stream);
+  return new Response(stream, { headers: new Headers(sseHeaders) });
 };
