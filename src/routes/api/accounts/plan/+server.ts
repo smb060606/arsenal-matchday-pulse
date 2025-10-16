@@ -4,6 +4,8 @@ import { BUDGET_PER_PLATFORM_DOLLARS, getPlatformCostConfig } from '$lib/config/
 import { getAccountsSnapshot } from '$lib/services/bskyService';
 import { BSKY_MAX_ACCOUNTS } from '$lib/config/bsky';
 import { getOverrides } from '$lib/services/accountOverrides';
+import { getAccountsSnapshot as getTwitterAccountsSnapshot } from '$lib/services/twitterService';
+import { TWITTER_MAX_ACCOUNTS } from '$lib/config/twitter';
 
 type PlatformPlan = {
   platform: 'bsky' | 'twitter' | 'threads';
@@ -13,7 +15,8 @@ type PlatformPlan = {
   notes?: string;
   maxAccountsAllowed?: number;
   selected?: Array<{
-    did: string;
+    did?: string;        // Bluesky
+    user_id?: string;    // Twitter
     handle: string;
     displayName?: string;
     followersCount?: number;
@@ -109,6 +112,14 @@ export const GET: RequestHandler = async ({ request }) => {
       costPerMonthDollars: twitterCfg.costPerMonthDollars,
       notes: twitterCfg.notes
     };
+
+    if (twitterCfg.status === 'ok') {
+      // If configured, compute a selection using overrides-aware twitter service
+      const accountsTw = await getTwitterAccountsSnapshot().catch(() => [] as PlatformPlan['selected']);
+      const maxAllowedTw = Math.max(0, TWITTER_MAX_ACCOUNTS);
+      twitterPlan.maxAccountsAllowed = maxAllowedTw;
+      twitterPlan.selected = (accountsTw ?? []).slice(0, maxAllowedTw);
+    }
 
     // Attach twitter overrides summary (gracefully empty if admin env missing)
     try {
