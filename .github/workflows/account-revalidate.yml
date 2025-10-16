@@ -1,0 +1,58 @@
+# Triggers the 30-day account re-evaluation job
+# Requires repository/environment secrets:
+#   - APP_BASE_URL: Base URL of your deployed app (e.g., https://your-app.vercel.app)
+#   - ADMIN_TOKEN: Same value as your server's ADMIN_TOKEN env var
+#
+# This will call POST /api/admin/accounts/revalidate to:
+#   - Refresh Bluesky allowlist into accounts_registry with stale flags
+#   - Purge expired overrides from account_overrides
+name: Account Revalidation (30 days)
+
+on:
+  schedule:
+    # At 06:00 on day-of-month 1. Adjust as you see fit.
+    - cron: "0 6 1 * *"
+  workflow_dispatch:
+    inputs:
+      baseUrl:
+        description: "Override APP_BASE_URL for manual runs"
+        required: false
+        type: string
+
+jobs:
+  revalidate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine base URL
+        id: base
+        run: |
+          if [ -n "${{ github.event.inputs.baseUrl }}" ]; then
+            echo "BASE_URL=${{ github.event.inputs.baseUrl }}" >> $GITHUB_OUTPUT
+          else
+            echo "BASE_URL=${{ secrets.APP_BASE_URL }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Call revalidation endpoint
+        env:
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          BASE_URL: ${{ steps.base.outputs.BASE_URL }}
+        run: |
+          if [ -z "$BASE_URL" ]; then
+            echo "ERROR: BASE_URL is empty. Set APP_BASE_URL secret or provide baseUrl input." >&2
+            exit 1
+          fi
+
+          echo "Calling $BASE_URL/api/admin/accounts/revalidate"
+          http_code=$(curl -s -o /tmp/resp.json -w "%{http_code}" \
+            -X POST "$BASE_URL/api/admin/accounts/revalidate" \
+            -H "Authorization: Bearer $ADMIN_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data '{}')
+
+          echo "HTTP $http_code"
+          cat /tmp/resp.json || true
+
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "Revalidation failed with HTTP $http_code" >&2
+            exit 1
+          fi

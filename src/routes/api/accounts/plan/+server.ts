@@ -110,6 +110,30 @@ export const GET: RequestHandler = async ({ request }) => {
       notes: twitterCfg.notes
     };
 
+    // Attach twitter overrides summary (gracefully empty if admin env missing)
+    try {
+      const ovTw = await getOverrides({ platform: 'twitter' }).catch(() => ({ include: [], exclude: [] }));
+      twitterPlan.overrides = {
+        include: (ovTw.include || []).map((o) => ({
+          identifier: o.identifier,
+          identifier_type: o.identifier_type,
+          scope: o.scope,
+          match_id: o.match_id,
+          bypass_eligibility: (o as any).bypass_eligibility ?? false,
+          expires_at: o.expires_at
+        })),
+        exclude: (ovTw.exclude || []).map((o) => ({
+          identifier: o.identifier,
+          identifier_type: o.identifier_type,
+          scope: o.scope,
+          match_id: o.match_id,
+          expires_at: o.expires_at
+        }))
+      };
+    } catch {
+      // ignore
+    }
+
     // Threads
     const threadsCfg = getPlatformCostConfig('threads');
     const threadsPlan: PlatformPlan = {
@@ -119,6 +143,30 @@ export const GET: RequestHandler = async ({ request }) => {
       costPerMonthDollars: threadsCfg.costPerMonthDollars,
       notes: threadsCfg.notes
     };
+
+    // Attach threads overrides summary (gracefully empty if admin env missing)
+    try {
+      const ovTh = await getOverrides({ platform: 'threads' }).catch(() => ({ include: [], exclude: [] }));
+      threadsPlan.overrides = {
+        include: (ovTh.include || []).map((o) => ({
+          identifier: o.identifier,
+          identifier_type: o.identifier_type,
+          scope: o.scope,
+          match_id: o.match_id,
+          bypass_eligibility: (o as any).bypass_eligibility ?? false,
+          expires_at: o.expires_at
+        })),
+        exclude: (ovTh.exclude || []).map((o) => ({
+          identifier: o.identifier,
+          identifier_type: o.identifier_type,
+          scope: o.scope,
+          match_id: o.match_id,
+          expires_at: o.expires_at
+        }))
+      };
+    } catch {
+      // ignore
+    }
 
     const payload = {
       generatedAt,
