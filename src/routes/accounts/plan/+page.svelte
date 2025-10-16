@@ -250,6 +250,41 @@
           To enable, set THREADS_COST_PER_MONTH_DOLLARS in your environment (must be ≤ ${budgetPerPlatformDollars}).
         </div>
       {/if}
+
+      {#if platforms.threads.overrides}
+        <div class="list" style="margin-top:0.75rem;">
+          <h3>Overrides</h3>
+          <div class="hstack">
+            <div class="chip">Includes: {platforms.threads.overrides.include?.length ?? 0}</div>
+            <div class="chip">Excludes: {platforms.threads.overrides.exclude?.length ?? 0}</div>
+          </div>
+
+          {#if (platforms.threads.overrides.include?.length ?? 0) > 0}
+            <div class="chips" style="margin-top:0.35rem;">
+              {#each platforms.threads.overrides.include as o}
+                <span class="chip">
+                  + {o.identifier}
+                  {#if o.scope === 'match'} (match: {o.match_id}){/if}
+                  {#if o.bypass_eligibility} • bypass{/if}
+                  {#if o.expires_at} • exp: {new Date(o.expires_at).toLocaleDateString()}{/if}
+                </span>
+              {/each}
+            </div>
+          {/if}
+
+          {#if (platforms.threads.overrides.exclude?.length ?? 0) > 0}
+            <div class="chips" style="margin-top:0.35rem;">
+              {#each platforms.threads.overrides.exclude as o}
+                <span class="chip">
+                  − {o.identifier}
+                  {#if o.scope === 'match'} (match: {o.match_id}){/if}
+                  {#if o.expires_at} • exp: {new Date(o.expires_at).toLocaleDateString()}{/if}
+                </span>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {/if}
     </div>
   </div>
 </div>
