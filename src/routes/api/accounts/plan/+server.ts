@@ -1,6 +1,6 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
-import { BUDGET_PER_PLATFORM_DOLLARS, getPlatformCostConfig } from '$lib/config/budget';
+import { BUDGET_PER_PLATFORM_DOLLARS, getPlatformCostConfig, estimateMaxAccounts } from '$lib/config/budget';
 import { getAccountsSnapshot } from '$lib/services/bskyService';
 import { BSKY_MAX_ACCOUNTS } from '$lib/config/bsky';
 import { getOverrides } from '$lib/services/accountOverrides';
@@ -115,9 +115,12 @@ export const GET: RequestHandler = async ({ request }) => {
 
     if (twitterCfg.status === 'ok') {
       // If configured, compute a selection using overrides-aware twitter service
-      const accountsTw = await getTwitterAccountsSnapshot().catch(() => [] as PlatformPlan['selected']);
-      const maxAllowedTw = Math.max(0, TWITTER_MAX_ACCOUNTS);
+      const cap = estimateMaxAccounts('twitter');
+      const maxAllowedTw = cap?.maxAccounts ?? Math.max(0, TWITTER_MAX_ACCOUNTS);
       twitterPlan.maxAccountsAllowed = maxAllowedTw;
+      (twitterPlan as any).capRationale = cap?.rationale ?? null;
+
+      const accountsTw = await getTwitterAccountsSnapshot().catch(() => [] as PlatformPlan['selected']);
       twitterPlan.selected = (accountsTw ?? []).slice(0, maxAllowedTw);
     }
 
@@ -154,6 +157,15 @@ export const GET: RequestHandler = async ({ request }) => {
       costPerMonthDollars: threadsCfg.costPerMonthDollars,
       notes: threadsCfg.notes
     };
+
+    if (threadsCfg.status === 'ok') {
+      const capTh = estimateMaxAccounts('threads');
+      const maxAllowedTh = capTh?.maxAccounts ?? undefined;
+      if (typeof maxAllowedTh === 'number') {
+        threadsPlan.maxAccountsAllowed = maxAllowedTh;
+        (threadsPlan as any).capRationale = capTh?.rationale ?? null;
+      }
+    }
 
     // Attach threads overrides summary (gracefully empty if admin env missing)
     try {

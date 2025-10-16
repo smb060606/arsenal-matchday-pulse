@@ -15,9 +15,19 @@
     budgetPerMonthDollars: number;
     costPerMonthDollars: number | null;
     notes?: string;
-    maxAccountsAllowed?: number;
-    selected?: Array<{
-      did: string;
+  maxAccountsAllowed?: number;
+  capRationale?: {
+    budget: number;
+    costPer1k: number;
+    requestsPerAccPerMin: number;
+    matchesPerMonth: number;
+    minutesPerMatch: number;
+    monthlyReqsPerAcc: number;
+    monthlyCostPerAcc: number;
+    buffer: number;
+  } | null;
+  selected?: Array<{
+    did: string;
       handle: string;
       displayName?: string;
       followersCount?: number;
@@ -224,7 +234,27 @@
       <div class="hstack" style="margin-top:0.5rem;">
         <div>Budget: ${platforms.twitter.budgetPerMonthDollars}</div>
         <div>Cost: {platforms.twitter.costPerMonthDollars == null ? '—' : `$${platforms.twitter.costPerMonthDollars}`}</div>
+        {#if platforms.twitter.maxAccountsAllowed != null}
+          <div>Max accounts: {platforms.twitter.maxAccountsAllowed}</div>
+        {/if}
       </div>
+
+      {#if platforms.twitter.capRationale}
+        <div class="list" style="margin-top:0.5rem;">
+          <h3>Cap Rationale</h3>
+          <div class="chips">
+            <span class="chip">budget ${platforms.twitter.capRationale.budget}</span>
+            <span class="chip">cost/1k {platforms.twitter.capRationale.costPer1k}</span>
+            <span class="chip">req/min/acc {platforms.twitter.capRationale.requestsPerAccPerMin}</span>
+            <span class="chip">matches/mo {platforms.twitter.capRationale.matchesPerMonth}</span>
+            <span class="chip">mins/match {platforms.twitter.capRationale.minutesPerMatch}</span>
+            <span class="chip">req/mo/acc {Math.round(platforms.twitter.capRationale.monthlyReqsPerAcc)}</span>
+            <span class="chip">cost/mo/acc ${platforms.twitter.capRationale.monthlyCostPerAcc}</span>
+            <span class="chip">buffer ×{platforms.twitter.capRationale.buffer}</span>
+          </div>
+        </div>
+      {/if}
+
       {#if platforms.twitter.status === 'unconfigured'}
         <div class="muted" style="margin-top:0.5rem;">
           To enable, set TWITTER_COST_PER_MONTH_DOLLARS in your environment (must be ≤ ${budgetPerPlatformDollars}).
@@ -244,7 +274,27 @@
       <div class="hstack" style="margin-top:0.5rem;">
         <div>Budget: ${platforms.threads.budgetPerMonthDollars}</div>
         <div>Cost: {platforms.threads.costPerMonthDollars == null ? '—' : `$${platforms.threads.costPerMonthDollars}`}</div>
+        {#if platforms.threads.maxAccountsAllowed != null}
+          <div>Max accounts: {platforms.threads.maxAccountsAllowed}</div>
+        {/if}
       </div>
+
+      {#if platforms.threads.capRationale}
+        <div class="list" style="margin-top:0.5rem;">
+          <h3>Cap Rationale</h3>
+          <div class="chips">
+            <span class="chip">budget ${platforms.threads.capRationale.budget}</span>
+            <span class="chip">cost/1k {platforms.threads.capRationale.costPer1k}</span>
+            <span class="chip">req/min/acc {platforms.threads.capRationale.requestsPerAccPerMin}</span>
+            <span class="chip">matches/mo {platforms.threads.capRationale.matchesPerMonth}</span>
+            <span class="chip">mins/match {platforms.threads.capRationale.minutesPerMatch}</span>
+            <span class="chip">req/mo/acc {Math.round(platforms.threads.capRationale.monthlyReqsPerAcc)}</span>
+            <span class="chip">cost/mo/acc ${platforms.threads.capRationale.monthlyCostPerAcc}</span>
+            <span class="chip">buffer ×{platforms.threads.capRationale.buffer}</span>
+          </div>
+        </div>
+      {/if}
+
       {#if platforms.threads.status === 'unconfigured'}
         <div class="muted" style="margin-top:0.5rem;">
           To enable, set THREADS_COST_PER_MONTH_DOLLARS in your environment (must be ≤ ${budgetPerPlatformDollars}).
