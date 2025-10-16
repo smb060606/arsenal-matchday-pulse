@@ -3,7 +3,8 @@
     { href: "/match/demo", label: "Demo Match (Pre | Live | Post)" },
     { href: "/accounts/bsky", label: "Accounts (Bluesky)" },
     { href: "/accounts/twitter", label: "Accounts (Twitter)" },
-    { href: "/compare/demo", label: "Compare View (Demo)" }
+    { href: "/compare/demo", label: "Compare View (Demo)" },
+    { href: "/methodology", label: "Methodology" }
   ];
 </script>
 
