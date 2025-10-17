@@ -15,7 +15,13 @@ const RATE_WINDOW_MS = Number(process.env.SUMMARIES_RATE_WINDOW_MS ?? 60_000); /
 const RATE_MAX = Number(process.env.SUMMARIES_RATE_MAX ?? 4); // max requests per window
 const SUMMARY_TIMEOUT_MS_DEFAULT = Number(process.env.SUMMARIES_TIMEOUT_MS ?? 15_000);
 
-// Utility: safely read env
+/**
+ * Return an environment variable value or a fallback when it is absent or empty.
+ *
+ * @param name - The environment variable name to read
+ * @param fallback - Value to return when the environment variable is unset or an empty string
+ * @returns The environment variable's value, or `fallback` if the variable is missing or empty
+ */
 function env(name: string, fallback?: string) {
   const v = process.env[name];
   return v && v.length > 0 ? v : fallback;
@@ -29,12 +35,24 @@ const MAX_CHARS = 12000;
 type Platform = 'bsky' | 'twitter' | 'threads' | 'combined';
 type Phase = 'pre' | 'live' | 'post';
 
+/**
+ * Normalize a platform identifier to one of the supported platform keys.
+ *
+ * @param p - The input platform string (may be null or any casing)
+ * @returns The normalized platform: `'bsky'`, `'twitter'`, `'threads'`, or `'combined'` (defaults to `'combined'` for unrecognized or null values)
+ */
 function normalizePlatform(p: string | null): Platform {
   const k = (p ?? 'combined').toLowerCase();
   if (k === 'bsky' || k === 'twitter' || k === 'threads' || k === 'combined') return k as Platform;
   return 'combined';
 }
 
+/**
+ * Normalize an input mode string to a recognized phase identifier.
+ *
+ * @param mode - The input mode value to normalize (case-insensitive).
+ * @returns `'pre'`, `'live'`, or `'post'` if `mode` matches one of these values (case-insensitive), `null` otherwise.
+ */
 function normalizePhase(mode: string | null): Phase | null {
   const k = (mode ?? '').toLowerCase();
   if (k === 'pre' || k === 'live' || k === 'post') return k as Phase;

@@ -27,6 +27,11 @@ export type EffectiveOverrides = {
   exclude: AccountOverride[];
 };
 
+/**
+ * Resolve a server-side Supabase admin client for administrative operations.
+ *
+ * @returns A Supabase admin client if available; otherwise `null`.
+ */
 function getAdminClient() {
   // Prefer centralized server-side admin client if available
   const admin = getSupabaseAdmin();
@@ -45,6 +50,13 @@ function getAdminClient() {
   });
 }
 
+/**
+ * Check whether an override row is currently active based on its `expires_at` timestamp.
+ *
+ * @param row - The AccountOverride row to evaluate
+ * @param nowMs - Reference time in milliseconds used to determine expiration
+ * @returns `true` if the row has no valid `expires_at` or its `expires_at` is greater than `nowMs`, `false` otherwise
+ */
 function notExpired(row: AccountOverride, nowMs: number) {
   if (!row.expires_at) return true;
   const exp = Date.parse(row.expires_at);
@@ -53,13 +65,13 @@ function notExpired(row: AccountOverride, nowMs: number) {
 }
 
 /**
- * Fetch overrides for a platform, optionally scoped to a match.
- * Precedence order (high → low):
- *  - match EXCLUDE
- *  - match INCLUDE
- *  - global EXCLUDE
- *  - global INCLUDE
- * Expired overrides are filtered out.
+ * Return effective account overrides for a platform, optionally limited to a specific match.
+ *
+ * Precedence (high → low): match EXCLUDE, match INCLUDE, global EXCLUDE, global INCLUDE. Expired overrides are excluded. When multiple overrides target the same account (keyed by `identifier_type|identifier`), the highest-precedence override is kept.
+ *
+ * @param matchId - If provided, include overrides scoped to this match in precedence evaluation; pass `null` to match explicit null `match_id` rows.
+ * @param nowMs - Optional epoch milliseconds to use when evaluating expiration; defaults to current time.
+ * @returns An object with `include` and `exclude` arrays of `AccountOverride` representing the final, deduplicated overrides according to the precedence rules.
  */
 export async function getOverrides(params: {
   platform: Platform;
@@ -113,7 +125,11 @@ export async function getOverrides(params: {
 }
 
 /**
- * Upsert a single override (admin API helper).
+ * Insert or update an account override record in the admin database.
+ *
+ * @param payload - Partial override data (all AccountOverride fields except `created_at` and `updated_at`; `id` may be provided to update an existing row). Fields that are not provided will be stored as `null` where applicable; `bypass_eligibility` defaults to `true` if omitted; `match_id` is stored only when `scope` is `'match'`.
+ * @returns The persisted `AccountOverride` row.
+ * @throws Rethrows the database error if the upsert operation fails.
  */
 export async function upsertOverride(payload: Omit<AccountOverride, 'id' | 'created_at' | 'updated_at'> & { id?: string }) {
   const sb = getAdminClient();
@@ -138,7 +154,11 @@ export async function upsertOverride(payload: Omit<AccountOverride, 'id' | 'crea
 }
 
 /**
- * Delete an override by id (admin API helper).
+ * Remove the account override with the specified id.
+ *
+ * @param id - The id of the override to delete.
+ * @returns An object with `ok: true` on success.
+ * @throws The error returned by the admin client if the delete operation fails.
  */
 export async function deleteOverride(id: string) {
   const sb = getAdminClient();

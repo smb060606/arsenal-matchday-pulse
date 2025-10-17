@@ -3,11 +3,27 @@ import { getSupabaseAdmin } from '$lib/supabaseAdmin';
 import type { BskyProfileBasic } from '$lib/services/bskyService';
 import { BSKY_MIN_ACCOUNT_MONTHS, BSKY_MIN_FOLLOWERS } from '$lib/config/bsky';
 
+/**
+ * Compute the approximate number of months between two dates.
+ *
+ * @param a - The first date to compare
+ * @param b - The second date to compare
+ * @returns The absolute difference in months (may be fractional), assuming 30 days per month
+ */
 function monthsBetween(a: Date, b: Date): number {
   const diffMs = Math.abs(a.getTime() - b.getTime());
   return diffMs / (1000 * 60 * 60 * 24 * 30);
 }
 
+/**
+ * Obtain a Supabase admin client from the existing helper or by creating one from environment variables.
+ *
+ * Tries getSupabaseAdmin() first; if that is not available, constructs a client using
+ * SUPABASE_URL or PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY. If required environment
+ * variables are missing, returns `null`.
+ *
+ * @returns A Supabase admin client instance, or `null` if an admin client cannot be obtained.
+ */
 function getAdminClient() {
   const admin = getSupabaseAdmin();
   if (admin) return admin as any;
@@ -22,7 +38,10 @@ function getAdminClient() {
 }
 
 /**
- * Upsert Bluesky profiles into accounts_registry and compute stale flags.
+ * Upserts an array of Bluesky profiles into the accounts_registry table and computes a stale flag for each profile.
+ *
+ * @param now - Reference timestamp used to compute account age and stale status; defaults to the current date and time
+ * @returns An object with `upserted` set to the number of rows written to the registry (0 if nothing was upserted)
  */
 export async function upsertAccountsRegistryBsky(
   profiles: BskyProfileBasic[],

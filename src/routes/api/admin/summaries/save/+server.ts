@@ -3,6 +3,12 @@ import { json } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseAdmin } from '$lib/supabaseAdmin';
 
+/**
+ * Checks whether the incoming request supplies the admin Bearer token.
+ *
+ * @param event - The server request event whose `authorization` header will be checked for a Bearer token
+ * @returns `true` if the Authorization header contains a Bearer token that exactly matches the `ADMIN_TOKEN` environment variable, `false` otherwise.
+ */
 function requireAdmin(event: any) {
   const hdr = event.request.headers.get('authorization') || '';
   const token = hdr.startsWith('Bearer ') ? hdr.slice('Bearer '.length) : '';
@@ -13,6 +19,11 @@ function requireAdmin(event: any) {
   return true;
 }
 
+/**
+ * Obtain a Supabase admin client, preferring an existing admin instance and falling back to creating one from server environment variables.
+ *
+ * @returns A Supabase client with admin privileges, or `null` when no admin instance is available and required environment variables are missing.
+ */
 function getDb() {
   const admin = getSupabaseAdmin();
   if (admin) return admin as any;
@@ -36,6 +47,12 @@ type SavePayload = {
   accountsUsed: any[];
 };
 
+/**
+ * Checks whether a value conforms to the SavePayload shape expected by the route.
+ *
+ * @param p - The candidate payload to validate.
+ * @returns `true` if `p` has a non-empty `matchId` string, a `platform` equal to `"bsky"`, `"twitter"`, or `"threads"`, a `phase` equal to `"pre"`, `"live"`, or `"post"`, a non-empty `generatedAt` string, a `summary` string, a non-null `sentiment` object, and `topics`, `samples`, and `accountsUsed` arrays; `false` otherwise.
+ */
 function validate(p: any): p is SavePayload {
   if (!p) return false;
   if (typeof p.matchId !== 'string' || !p.matchId.trim()) return false;

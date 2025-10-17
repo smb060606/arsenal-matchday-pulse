@@ -5,12 +5,10 @@ import { resolveAllowlistProfiles } from '$lib/services/bskyService';
 import { upsertAccountsRegistryBsky } from '$lib/services/accountsRegistry';
 
 /**
- * Admin endpoint to re-evaluate account health every ~30 days.
- * - Refresh allowlist profiles (Bluesky) and upsert into accounts_registry with stale flags
- * - Purge expired overrides to keep table lean (selection already ignores expired)
+ * Validate that the incoming request presents the expected admin Bearer token.
  *
- * Authorization:
- *  - Requires Authorization: Bearer ADMIN_TOKEN
+ * @param event - The request event whose `Authorization` header will be checked for a `Bearer` token
+ * @returns `true` if the `Authorization` header contains a Bearer token equal to the `ADMIN_TOKEN` environment variable, `false` otherwise.
  */
 function requireAdmin(event: any) {
   const hdr = event.request.headers.get('authorization') || '';

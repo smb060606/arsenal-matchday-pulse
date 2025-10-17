@@ -34,6 +34,15 @@ export type PlatformCostConfig = {
   notes: string;
 };
 
+/**
+ * Return the cost configuration and configuration status for the specified platform.
+ *
+ * For Bluesky (`bsky`) this returns a cost of $0 with a note about AppView usage.
+ * For `twitter` and `threads` this reads the corresponding environment variable and marks the platform as `unconfigured` if the value is missing or blank.
+ *
+ * @param platform - The platform key to query (`'bsky' | 'twitter' | 'threads'`)
+ * @returns A PlatformCostConfig containing the platform, `costPerMonthDollars` (number or `null`), `status` (`'ok'` or `'unconfigured'`), and a human-readable `notes` string explaining the configuration state
+ */
 export function getPlatformCostConfig(platform: PlatformKey): PlatformCostConfig {
   switch (platform) {
     case 'bsky': {
@@ -85,8 +94,13 @@ export function getPlatformCostConfig(platform: PlatformKey): PlatformCostConfig
 }
 
 /**
- * Cost-to-Cap Estimator (admin-only consumption in planner API)
- * Converts pricing + request rate assumptions into a safe max accounts cap (X).
+ * Reads an environment variable and returns its numeric value or a provided default.
+ *
+ * If the variable is missing or an empty string, `def` is returned. The value is parsed with `Number` and only finite numbers are accepted; otherwise `def` is returned.
+ *
+ * @param name - Environment variable name to read
+ * @param def - Fallback value to return when the environment variable is missing, blank, or not a finite number
+ * @returns The parsed finite numeric value of the environment variable, or `def`
  */
 
 function readNumberEnv(name: string, def: number | null): number | null {
@@ -107,6 +121,15 @@ type PricingParams = {
   requestsPerAccountPerMin: number | null;
 };
 
+/**
+ * Determine pricing parameters for a platform used by the estimator.
+ *
+ * @param platform - The platform key to retrieve pricing for
+ * @returns An object containing:
+ *  - `costPer1k`: dollars per 1,000 requests, or `null` if the cost is not configured
+ *  - `requestsPerAccountPerMin`: expected requests per account per minute, or `null` if unknown
+ * For Bluesky (`bsky`) both fields are `0` and the estimator is not applied for that platform.
+ */
 function getPricingParams(platform: PlatformKey): PricingParams {
   switch (platform) {
     case 'twitter':
@@ -141,6 +164,13 @@ export type CapEstimate = {
   };
 };
 
+/**
+ * Estimate the maximum number of accounts that can be supported for a given platform using configured pricing, match/request assumptions, and the per-platform budget.
+ *
+ * The estimator returns `null` when estimation is not applicable: the platform is unconfigured, pricing or request-rate data is unavailable or invalid, or the platform is excluded from estimation (e.g., Bluesky).
+ *
+ * @returns A `CapEstimate` with `maxAccounts` and a `rationale` object detailing inputs and intermediate values, or `null` if an estimate cannot be produced.
+ */
 export function estimateMaxAccounts(platform: PlatformKey): CapEstimate | null {
   const cfg = getPlatformCostConfig(platform);
   if (cfg.status !== 'ok') return null;
