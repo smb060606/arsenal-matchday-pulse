@@ -2,6 +2,12 @@ import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
 import { getOverrides, upsertOverride, deleteOverride, type Platform } from '$lib/services/accountOverrides';
 
+/**
+ * Checks whether the incoming request includes a valid admin Bearer token.
+ *
+ * @param event - The request event whose Authorization header is inspected for a Bearer token.
+ * @returns `true` if the Authorization Bearer token matches the `ADMIN_TOKEN` environment variable, `false` otherwise.
+ */
 function requireAdmin(event: any) {
   const hdr = event.request.headers.get('authorization') || '';
   const token = hdr.startsWith('Bearer ') ? hdr.slice('Bearer '.length) : '';

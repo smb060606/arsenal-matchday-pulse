@@ -107,6 +107,12 @@ function toProfileBasic(p: any): BskyProfileBasic {
   };
 }
 
+/**
+ * Resolve a list of Bsky handles into basic profile objects.
+ *
+ * @param handles - Actor identifiers (handles or DIDs) to resolve; defaults to the configured allowlist when omitted
+ * @returns An array of `BskyProfileBasic` for handles that were successfully resolved; any handles that cannot be resolved are omitted
+ */
 export async function resolveAllowlistProfiles(handles: string[] = BSKY_ALLOWLIST): Promise<BskyProfileBasic[]> {
   if (!handles.length) return [];
   const agent = await getAgent();
@@ -135,6 +141,12 @@ export async function resolveAllowlistProfiles(handles: string[] = BSKY_ALLOWLIS
   return profiles;
 }
 
+/**
+ * Retrieve basic profile data for the given list of actor identifiers.
+ *
+ * @param actors - Array of actor identifiers (handles or DIDs) to resolve
+ * @returns An array of `BskyProfileBasic` profiles corresponding to resolved actors; returns an empty array if no actors are provided or if resolution fails
+ */
 async function fetchProfilesByActors(actors: string[]): Promise<BskyProfileBasic[]> {
   if (!actors.length) return [];
   const agent = await getAgent();
@@ -147,6 +159,12 @@ async function fetchProfilesByActors(actors: string[]): Promise<BskyProfileBasic
   }
 }
 
+/**
+ * Determine whether a profile meets the configured follower and account-age eligibility requirements.
+ *
+ * @param profile - Basic profile object; `followersCount` and `createdAt` are used to evaluate eligibility
+ * @returns An object where `eligible` is `true` if the profile satisfies follower and minimum-account-age checks, `false` otherwise, and `reasons` lists human-readable diagnostics for each check
+ */
 export function computeEligibility(profile: BskyProfileBasic): Eligibility {
   const reasons: string[] = [];
   let ok = true;
@@ -175,6 +193,15 @@ export function computeEligibility(profile: BskyProfileBasic): Eligibility {
   return { eligible: ok, reasons };
 }
 
+/**
+ * Builds a prioritized list of eligible accounts for bsky analysis.
+ *
+ * Resolves the configured allowlist, then applies per-match and global overrides: identifiers in the include list are resolved (with a minimal fallback if unresolved) and may bypass eligibility; identifiers in the exclude list are omitted. The final set preserves included overrides first, then remaining eligible allowlist profiles, sorts by follower count (descending), and is capped to BSKY_MAX_ACCOUNTS.
+ *
+ * @param params - Optional parameters for selection.
+ * @param params.matchId - If provided, use per-match overrides in addition to global overrides; null or undefined uses only global overrides.
+ * @returns An array of SelectedAccount objects (each with `profile` and `eligibility`), ordered with include overrides first and then base allowlist entries sorted by follower count; length is limited to `BSKY_MAX_ACCOUNTS`.
+ */
 export async function selectEligibleAccounts(params?: { matchId?: string | null }): Promise<SelectedAccount[]> {
   const matchId = params?.matchId ?? null;
 
@@ -270,6 +297,15 @@ export async function selectEligibleAccounts(params?: { matchId?: string | null 
   return merged;
 }
 
+/**
+ * Fetches recent text posts for the provided accounts within a sliding time window.
+ *
+ * For each account (identified by DID or handle) this queries the author's feed, collects posts whose timestamps are within the last `sinceMinutes`, and returns them as simplified post objects. Entries without a resolvable actor, without a created timestamp, or without text are skipped. Feed shape variations are tolerated and per-account errors are ignored so other accounts continue to be processed.
+ *
+ * @param accounts - Selected accounts to fetch posts for (uses each account's DID or handle to identify the author)
+ * @param sinceMinutes - Lookback window in minutes; must be >0. Defaults to the module's DEFAULT_RECENCY_MINUTES when invalid or omitted.
+ * @returns An array of simplified posts containing uri, cid, author (did, handle, displayName), text, and createdAt for posts found within the lookback window
+ */
 export async function fetchRecentPostsForAccounts(
   accounts: SelectedAccount[],
   sinceMinutes: number = DEFAULT_RECENCY_MINUTES
@@ -329,6 +365,12 @@ export async function fetchRecentPostsForAccounts(
   return out;
 }
 
+/**
+ * Compute aggregate sentiment ratios and counts for an array of posts.
+ *
+ * @param posts - Posts whose `text` will be analyzed for sentiment
+ * @returns An object containing `ratios` (pos, neg, neu as fractions of posts) and `counts` (total number of posts and counts of positive, neutral, and negative posts)
+ */
 export function summarizeSentiment(posts: SimplePost[]) {
   let posCount = 0;
   let negCount = 0;
@@ -353,6 +395,15 @@ export function summarizeSentiment(posts: SimplePost[]) {
   };
 }
 
+/**
+ * Count occurrences of configured keywords in post texts and return the top matches.
+ *
+ * Matches keywords case-insensitively but preserves and reports the original configured keyword casing.
+ *
+ * @param posts - Array of posts whose `text` fields will be searched for keywords
+ * @param keywords - Keywords to search for (defaults to configured BSKY_KEYWORDS)
+ * @returns An array of `{ keyword, count }` objects sorted by descending `count`, limited to the top 10 keywords
+ */
 export function extractTopics(posts: SimplePost[], keywords: string[] = BSKY_KEYWORDS) {
   // Preserve original casing from configured keywords while matching case-insensitively
   const origByLower = new Map<string, string>();
@@ -384,6 +435,17 @@ export function sampleQuotes(posts: SimplePost[], n = 5) {
   }));
 }
 
+/**
+ * Builds a TickSummary by aggregating recent posts from selected accounts and computing sentiment, topics, and sample quotes for a given match, window, and tick.
+ *
+ * This function selects eligible accounts, fetches recent posts within the provided lookback window, and computes analytics. If no posts are found it will retry with a broader lookback (at least 60 minutes). In a test environment, a single synthetic post may be generated to ensure a non-empty result.
+ *
+ * @param matchId - Identifier of the match to associate with the tick
+ * @param window - Time window label (`'pre'`, `'live'`, or `'post'`)
+ * @param tick - Numeric tick index for the summary
+ * @param sinceMinutes - Initial lookback window in minutes used to fetch recent posts; may be broadened if no posts are found
+ * @returns A TickSummary object containing match and window identifiers, generation timestamp, tick index, aggregated sentiment (ratios and counts), post volume, accounts used, extracted topics, and sample quotes
+ */
 export async function buildTick(
   matchId: string,
   window: 'pre' | 'live' | 'post',

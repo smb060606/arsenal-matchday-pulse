@@ -43,7 +43,12 @@ export const DEFAULT_RECENCY_MINUTES = TWITTER_DEFAULT_RECENCY_MINUTES;
 
 // Placeholder resolver: convert allowlist handles to minimal profiles.
 // In a future iteration, this should call Twitter API to resolve user_id,
-// followers, posts, createdAt, etc, and feed into accounts_registry.
+/**
+ * Create minimal TwitterProfileBasic records for a list of handles.
+ *
+ * @param handles - Array of Twitter handles to resolve; defaults to the configured allowlist
+ * @returns An array of profiles where each entry has `handle` and `displayName` set to the handle, `followersCount` and `postsCount` left undefined, and `createdAt` set to `null`
+ */
 export async function resolveAllowlistProfiles(handles: string[] = TWITTER_ALLOWLIST): Promise<TwitterProfileBasic[]> {
   return handles.map((h) => ({
     handle: h,
@@ -54,11 +59,24 @@ export async function resolveAllowlistProfiles(handles: string[] = TWITTER_ALLOW
   }));
 }
 
+/**
+ * Compute the approximate number of months elapsed between two dates.
+ *
+ * @param a - One of the two dates; order does not matter
+ * @param b - The other date; order does not matter
+ * @returns The absolute difference in months (may be fractional) between `a` and `b`, approximating a month as 30 days
+ */
 function monthsBetween(a: Date, b: Date): number {
   const diffMs = Math.abs(a.getTime() - b.getTime());
   return diffMs / (1000 * 60 * 60 * 24 * 30);
 }
 
+/**
+ * Evaluate a Twitter profile against configured minimum followers and account-age requirements.
+ *
+ * @param profile - The Twitter profile to evaluate (may omit `user_id`, `followersCount`, or `createdAt`)
+ * @returns An object with `eligible` set to `true` if the profile meets the minimum followers and account-age requirements (when `createdAt` is present), `false` otherwise; `reasons` lists the checks and outcomes, including an explicit note when account age is unknown
+ */
 export function computeEligibility(profile: TwitterProfileBasic): Eligibility {
   const reasons: string[] = [];
   let ok = true;
@@ -87,17 +105,23 @@ export function computeEligibility(profile: TwitterProfileBasic): Eligibility {
   return { eligible: ok, reasons };
 }
 
+/**
+ * Produce a stable string key for a Twitter profile using the user ID when available, otherwise the handle.
+ *
+ * @param p - The Twitter profile to key
+ * @returns `id:<user_id>` when `user_id` is present, otherwise `handle:<handle>`
+ */
 function keyOf(p: TwitterProfileBasic): string {
   return p.user_id ? `id:${p.user_id}` : `handle:${p.handle}`;
 }
 
 /**
- * Select eligible Twitter accounts applying admin overrides.
- * Precedence (high → low):
- *  - match EXCLUDE
- *  - match INCLUDE
- *  - global EXCLUDE
- *  - global INCLUDE
+ * Selects eligible Twitter accounts applying admin include/exclude overrides.
+ *
+ * Precedence (high → low): match EXCLUDE, match INCLUDE, global EXCLUDE, global INCLUDE.
+ *
+ * @param params - Optional parameters; `matchId` limits override lookup to a specific match when provided.
+ * @returns An array of selected accounts (profile and eligibility). Admin-included accounts are preserved first, then additional eligible allowlist accounts are ordered by descending follower count; the result is limited to the configured maximum number of accounts.
  */
 export async function selectEligibleAccounts(params?: { matchId?: string | null }): Promise<SelectedAccount[]> {
   const matchId = params?.matchId ?? null;
@@ -171,7 +195,13 @@ export async function selectEligibleAccounts(params?: { matchId?: string | null 
   return merged;
 }
 
-// Placeholder: in the future, this will fetch tweets for the selected accounts.
+/**
+ * Fetches recent tweets authored by the provided accounts within the given time window.
+ *
+ * @param accounts - Selected accounts to retrieve tweets for
+ * @param sinceMinutes - Time window, in minutes, to look back for tweets (defaults to DEFAULT_RECENCY_MINUTES)
+ * @returns An array of tweets authored by the provided accounts created within the specified time window
+ */
 export async function fetchRecentTweetsForAccounts(
   _accounts: SelectedAccount[],
   _sinceMinutes: number = DEFAULT_RECENCY_MINUTES
@@ -179,7 +209,18 @@ export async function fetchRecentTweetsForAccounts(
   return [];
 }
 
-// Convenience for planner-style snapshot (parity with Bluesky)
+/**
+ * Produce a planner-style snapshot of selected Twitter accounts with profile fields and computed eligibility.
+ *
+ * @returns An array of account snapshots where each item contains:
+ * - `user_id` (optional) — the account's user id when known
+ * - `handle` — the account handle
+ * - `displayName` (optional) — the account display name when known
+ * - `followersCount` (optional) — the follower count when known
+ * - `postsCount` (optional) — the posts/tweets count when known
+ * - `createdAt` — the account creation timestamp as an ISO string or `null` when unavailable
+ * - `eligibility` — the computed eligibility object with `eligible` and `reasons`
+ */
 export async function getAccountsSnapshot(): Promise<
   Array<{
     user_id?: string;

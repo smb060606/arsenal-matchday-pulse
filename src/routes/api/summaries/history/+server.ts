@@ -3,6 +3,11 @@ import { json } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseAdmin } from '$lib/supabaseAdmin';
 
+/**
+ * Obtain a Supabase client for server-side use, preferring an existing admin client and falling back to environment-configured credentials.
+ *
+ * @returns A Supabase client instance configured for server use, or `null` when no admin client and required environment variables are present.
+ */
 function getDb() {
   const admin = getSupabaseAdmin();
   if (admin) return admin as any;
