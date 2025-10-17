@@ -22,19 +22,24 @@ on:
 jobs:
   revalidate:
     runs-on: ubuntu-latest
+    env:
+      APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+      ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
     steps:
       - name: Determine base URL
         id: base
+        if: ${{ github.event_name == 'workflow_dispatch' || (env.APP_BASE_URL != '' && env.ADMIN_TOKEN != '') }}
         run: |
           if [ -n "${{ github.event.inputs.baseUrl }}" ]; then
             echo "BASE_URL=${{ github.event.inputs.baseUrl }}" >> $GITHUB_OUTPUT
           else
-            echo "BASE_URL=${{ secrets.APP_BASE_URL }}" >> $GITHUB_OUTPUT
+            echo "BASE_URL=${{ env.APP_BASE_URL }}" >> $GITHUB_OUTPUT
           fi
 
       - name: Call revalidation endpoint
+        if: ${{ github.event_name == 'workflow_dispatch' || (env.APP_BASE_URL != '' && env.ADMIN_TOKEN != '') }}
         env:
-          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          ADMIN_TOKEN: ${{ env.ADMIN_TOKEN }}
           BASE_URL: ${{ steps.base.outputs.BASE_URL }}
         run: |
           if [ -z "$BASE_URL" ]; then
