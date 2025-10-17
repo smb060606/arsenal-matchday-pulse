@@ -11,7 +11,7 @@ const mGetSupabaseAdmin = vi.mocked(getSupabaseAdmin);
 
 function makeEvent(body?: any, token?: string) {
   const headers = new Headers();
-  if (token) headers.set('authorization', `Bearer ${token}`);
+  if (token) headers.set('x-admin-token', token);
   const req = new Request('http://localhost/api/admin/summaries/save', {
     method: 'POST',
     headers,
@@ -25,11 +25,11 @@ describe('/api/admin/summaries/save (+server)', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (process as any).env.ADMIN_TOKEN = TOKEN;
+    (process as any).env.ADMIN_SECRET = TOKEN;
   });
 
   afterEach(() => {
-    delete (process as any).env.ADMIN_TOKEN;
+    delete (process as any).env.ADMIN_SECRET;
   });
 
   it('rejects without authorization', async () => {

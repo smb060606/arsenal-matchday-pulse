@@ -59,20 +59,19 @@ export const GET: RequestHandler = async ({ setHeaders, url }) => {
       const loop = async () => {
         while (!stopped) {
           try {
-            // Determine current window
-            const dynamic = forceWindow ?? (() => {
-              const w = getWindowState({ kickoffISO, liveDurationMin });
-              return w === 'ended' ? 'post' : w; // treat ended as post to send a final tick then close
-            })();
+            // Determine current window once
+            const state = forceWindow ?? getWindowState({ kickoffISO, liveDurationMin });
+            const dynamic = state === 'ended' ? 'post' : state;
 
-            // If we are past post window, end the stream gracefully
-            if (!forceWindow && getWindowState({ kickoffISO, liveDurationMin }) === 'ended') {
+            // Build and send tick
+            const payload = await buildTick(matchId, dynamic as 'pre' | 'live' | 'post', tick++, sinceMin);
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+
+            // If window has ended, emit ended event and break after final tick
+            if (!forceWindow && state === 'ended') {
               controller.enqueue(encoder.encode(`event: ended\ndata: ${JSON.stringify({ matchId, at: new Date().toISOString() })}\n\n`));
               break;
             }
-
-            const payload = await buildTick(matchId, dynamic as 'pre' | 'live' | 'post', tick++, sinceMin);
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
           } catch (e) {
             const err = { message: 'tick_failed' };
             controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify(err)}\n\n`));

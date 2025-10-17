@@ -1,3 +1,4 @@
+'use server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseAdmin } from '$lib/supabaseAdmin';
 import type { BskyProfileBasic } from '$lib/services/bskyService';
@@ -74,8 +75,8 @@ export async function upsertAccountsRegistryBsky(
 
   const { error } = await sb.from('accounts_registry').upsert(rows, { onConflict: 'platform, did, user_id, handle' });
   if (error) {
-    // Swallow errors to avoid breaking admin job
-    return { upserted: 0 };
+    console.error('accountsRegistry.upsertAccountsRegistryBsky: upsert failed', { error: String(error) });
+    throw new Error('accounts_registry_upsert_failed');
   }
   return { upserted: rows.length };
 }

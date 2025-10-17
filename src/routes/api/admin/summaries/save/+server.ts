@@ -10,13 +10,9 @@ import { getSupabaseAdmin } from '$lib/supabaseAdmin';
  * @returns `true` if the Authorization header contains a Bearer token that exactly matches the `ADMIN_TOKEN` environment variable, `false` otherwise.
  */
 function requireAdmin(event: any) {
-  const hdr = event.request.headers.get('authorization') || '';
-  const token = hdr.startsWith('Bearer ') ? hdr.slice('Bearer '.length) : '';
-  const expected = process.env.ADMIN_TOKEN;
-  if (!expected || token !== expected) {
-    return false;
-  }
-  return true;
+  const token = event.request.headers.get('x-admin-token') || '';
+  const expected = process.env.ADMIN_SECRET;
+  return !!expected && token === expected;
 }
 
 /**

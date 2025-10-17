@@ -118,7 +118,7 @@ describe('accountsRegistry.upsertAccountsRegistryBsky', () => {
     expect(byHandle['unknown.bsky.social'].stale).toBe(false);
   });
 
-  it('swallows upsert errors and returns { upserted: 0 }', async () => {
+  it('throws on upsert error with context surfaced', async () => {
     const mockSb = {
       from: () => ({
         upsert: () => ({ error: new Error('db-fail') })
@@ -131,18 +131,19 @@ describe('accountsRegistry.upsertAccountsRegistryBsky', () => {
     const mod = await import('$lib/services/accountsRegistry');
     const { upsertAccountsRegistryBsky } = mod;
 
-    const res = await upsertAccountsRegistryBsky(
-      [
-        {
-          did: 'did:plc:test',
-          handle: 'test.bsky.social',
-          followersCount: 1000,
-          postsCount: 5,
-          createdAt: '2020-01-01T00:00:00Z'
-        }
-      ] as any,
-      new Date()
-    );
-    expect(res).toEqual({ upserted: 0 });
+    await expect(
+      upsertAccountsRegistryBsky(
+        [
+          {
+            did: 'did:plc:test',
+            handle: 'test.bsky.social',
+            followersCount: 1000,
+            postsCount: 5,
+            createdAt: '2020-01-01T00:00:00Z'
+          }
+        ] as any,
+        new Date()
+      )
+    ).rejects.toThrow('accounts_registry_upsert_failed');
   });
 });

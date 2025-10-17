@@ -102,11 +102,27 @@ export async function getOverrides(params: {
 
   const rows = (data || []).filter((r) => notExpired(r as AccountOverride, nowMs)) as AccountOverride[];
 
-  const matchRows = rows.filter((r) => r.scope === 'match' && r.match_id === (matchId ?? null));
+  // Only include match-scoped rows when a concrete matchId is provided
+  const matchRows = matchId ? rows.filter((r) => r.scope === 'match' && r.match_id === matchId) : [];
   const globalRows = rows.filter((r) => r.scope === 'global');
 
-  // Precedence: match overrides first, then global
-  const prioritized = [...matchRows, ...globalRows];
+  // Precedence: match overrides first, then global; ensure EXCLUDE wins deterministically per-identifier
+  const prioritizedBase = [...matchRows, ...globalRows];
+  const withIndex = prioritizedBase.map((r, idx) => ({
+    r,
+    idx,
+    key: `${r.identifier_type}|${r.identifier}`
+  }));
+  withIndex.sort((a, b) => {
+    if (a.key === b.key) {
+      if (a.r.action === b.r.action) return a.idx - b.idx;
+      // Place EXCLUDE before INCLUDE when identifiers match
+      return a.r.action === 'exclude' ? -1 : 1;
+    }
+    // Preserve original segment order (match before global) and overall stability
+    return a.idx - b.idx;
+  });
+  const prioritized = withIndex.map((x) => x.r);
 
   // Collapse into include/exclude keeping first occurrence for a given identifier (match beats global)
   const seen = new Set<string>(); // key by identifier_type|identifier

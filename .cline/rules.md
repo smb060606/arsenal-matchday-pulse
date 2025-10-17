@@ -49,8 +49,9 @@ Persistence & Public History
 Security & Operations
 - Supabase: Use RLS; writes via admin/service role only in server-side routes (never in client).
 - Secrets: ADMIN_TOKEN/ADMIN_SECRET are for server-side only; never expose via client bundle.
+- Note: Admin endpoints require the x-admin-token: <ADMIN_SECRET> header; do not use Authorization: Bearer.
 - Admin endpoints:
-  - Summaries save endpoint (Bearer ADMIN_TOKEN)
+  - Summaries save endpoint (x-admin-token: <ADMIN_SECRET>)
   - Accounts overrides CRUD (guarded by admin secret)
   - Accounts plan/cap estimator (admin-only)
 - Logging sufficient to audit budget usage and estimator assumptions (admin-only).

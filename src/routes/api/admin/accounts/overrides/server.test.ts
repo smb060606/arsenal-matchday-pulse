@@ -42,23 +42,23 @@ describe('/api/admin/accounts/overrides (+server)', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.ADMIN_TOKEN = TOKEN;
+    process.env.ADMIN_SECRET = TOKEN;
   });
 
   afterEach(() => {
-    delete process.env.ADMIN_TOKEN;
+    delete process.env.ADMIN_SECRET;
   });
 
   describe('authorization', () => {
-    it('returns 401 when ADMIN_TOKEN missing or wrong', async () => {
+    it('returns 401 when ADMIN_SECRET missing or wrong', async () => {
       // No header
       const ev1 = makeEvent({});
       let res = await GET(ev1);
       expect(res.status).toBe(401);
 
-      // Wrong bearer token
+      // Wrong admin header
       const ev2 = makeEvent({
-        headers: { authorization: 'Bearer wrong' }
+        headers: { 'x-admin-token': 'wrong' }
       });
       res = await GET(ev2);
       expect(res.status).toBe(401);
@@ -107,7 +107,7 @@ describe('/api/admin/accounts/overrides (+server)', () => {
       });
 
       const ev = makeEvent({
-        headers: { authorization: `Bearer ${TOKEN}` },
+        headers: { 'x-admin-token': TOKEN },
         url: 'http://localhost/api/admin/accounts/overrides?platform=bsky&matchId=M1'
       });
 
@@ -141,7 +141,7 @@ describe('/api/admin/accounts/overrides (+server)', () => {
 
       const ev = makeEvent({
         method: 'POST',
-        headers: { authorization: `Bearer ${TOKEN}` },
+        headers: { 'x-admin-token': TOKEN },
         body: payload
       });
 
@@ -164,7 +164,7 @@ describe('/api/admin/accounts/overrides (+server)', () => {
       mDeleteOverride.mockResolvedValue({ ok: true } as any);
       const ev = makeEvent({
         method: 'DELETE',
-        headers: { authorization: `Bearer ${TOKEN}` },
+        headers: { 'x-admin-token': TOKEN },
         url: 'http://localhost/api/admin/accounts/overrides?id=abc-123'
       });
 
@@ -178,7 +178,7 @@ describe('/api/admin/accounts/overrides (+server)', () => {
     it('returns 400 when id is missing', async () => {
       const ev = makeEvent({
         method: 'DELETE',
-        headers: { authorization: `Bearer ${TOKEN}` },
+        headers: { 'x-admin-token': TOKEN },
         url: 'http://localhost/api/admin/accounts/overrides'
       });
       const res = await DELETE(ev);

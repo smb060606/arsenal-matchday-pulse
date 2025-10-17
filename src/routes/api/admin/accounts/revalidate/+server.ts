@@ -5,15 +5,12 @@ import { resolveAllowlistProfiles } from '$lib/services/bskyService';
 import { upsertAccountsRegistryBsky } from '$lib/services/accountsRegistry';
 
 /**
- * Validate that the incoming request presents the expected admin Bearer token.
- *
- * @param event - The request event whose `Authorization` header will be checked for a `Bearer` token
- * @returns `true` if the `Authorization` header contains a Bearer token equal to the `ADMIN_TOKEN` environment variable, `false` otherwise.
+ * Authorization:
+ * - Requires header: x-admin-token: <ADMIN_SECRET>
  */
 function requireAdmin(event: any) {
-  const hdr = event.request.headers.get('authorization') || '';
-  const token = hdr.startsWith('Bearer ') ? hdr.slice('Bearer '.length) : '';
-  const expected = process.env.ADMIN_TOKEN;
+  const token = event.request.headers.get('x-admin-token') || '';
+  const expected = process.env.ADMIN_SECRET;
   return !!expected && token === expected;
 }
 
@@ -36,7 +33,7 @@ export const POST: RequestHandler = async (event) => {
     const profiles = await resolveAllowlistProfiles();
     const { upserted } = await upsertAccountsRegistryBsky(profiles, now);
     bskyUpserted = upserted;
-  } catch (e: any) {
+  } catch {
     // continue; we still want to attempt purge
   }
 

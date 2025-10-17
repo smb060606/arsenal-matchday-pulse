@@ -51,7 +51,7 @@
         // Non-JSON message; ignore
       }
     };
-    es.onerror = () => es.close();
+    es.onerror = () => { /* keep connection open to allow auto-reconnect */ };
     return es;
   }
 

@@ -75,7 +75,7 @@ export const GET: RequestHandler = async ({ url }) => {
       phase = mode;
     } else if (kickoffISO) {
       const state = getWindowState({ kickoffISO, liveDurationMin });
-      phase = state === 'pre' || state === 'post' ? state : 'live';
+      phase = state === 'pre' ? 'pre' : state === 'post' || state === 'ended' ? 'post' : 'live';
     }
 
     const nowMs = Date.now();

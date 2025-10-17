@@ -48,8 +48,8 @@
 
   function saveToken() {
     try {
-      localStorage.setItem('ADMIN_TOKEN', adminToken);
-      infoMsg = 'Admin token saved locally';
+      sessionStorage.setItem('ADMIN_TOKEN', adminToken);
+      infoMsg = 'Admin token saved for this session';
       setTimeout(() => (infoMsg = ''), 2500);
     } catch {
       // ignore
@@ -58,7 +58,7 @@
 
   function loadToken() {
     try {
-      const t = localStorage.getItem('ADMIN_TOKEN');
+      const t = sessionStorage.getItem('ADMIN_TOKEN');
       if (t) adminToken = t;
     } catch {
       // ignore
@@ -78,7 +78,7 @@
       }).toString();
       const res = await fetch(`/api/admin/accounts/overrides?${qs}`, {
         headers: {
-          Authorization: `Bearer ${adminToken}`
+          'x-admin-token': adminToken
         }
       });
       if (!res.ok) {
@@ -121,7 +121,7 @@
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${adminToken}`
+          'x-admin-token': adminToken
         },
         body: JSON.stringify(payload)
       });
@@ -149,7 +149,7 @@
       const res = await fetch(`/api/admin/accounts/overrides?id=${encodeURIComponent(id)}`, {
         method: 'DELETE',
         headers: {
-          Authorization: `Bearer ${adminToken}`
+          'x-admin-token': adminToken
         }
       });
       if (!res.ok) {
@@ -177,13 +177,13 @@
     <div class="row">
       <input
         type="password"
-        placeholder="Enter ADMIN_TOKEN"
+        placeholder="Enter ADMIN_SECRET"
         bind:value={adminToken}
         autocomplete="off"
       />
       <button on:click={saveToken}>Save</button>
     </div>
-    <small>Token stored in this browser's localStorage for convenience. Do not share.</small>
+    <small>Token stored in this tab's sessionStorage for convenience. Do not share.</small>
   </div>
 
   <div class="card">
