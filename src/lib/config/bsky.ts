@@ -1,8 +1,8 @@
 export const BSKY_APPVIEW_BASE = "https://public.api.bsky.app/xrpc";
 
 // Eligibility/config (initial defaults)
-// Per latest requirement: drop Bluesky follower threshold to > 100
-export const BSKY_MIN_FOLLOWERS = 100;
+// Align with tests/spec: minimum followers threshold set to 500
+export const BSKY_MIN_FOLLOWERS = 500;
 
 // Bluesky is too new for 3-year requirement; use 6 months default and disclose in UI
 export const BSKY_MIN_ACCOUNT_MONTHS = 6;

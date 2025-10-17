@@ -1,7 +1,11 @@
 import type { RequestHandler } from '@sveltejs/kit';
-import { BUDGET_PER_PLATFORM_DOLLARS, getPlatformCostConfig } from '$lib/config/budget';
+import { env } from '$env/dynamic/private';
+import { BUDGET_PER_PLATFORM_DOLLARS, getPlatformCostConfig, estimateMaxAccounts } from '$lib/config/budget';
 import { getAccountsSnapshot } from '$lib/services/bskyService';
 import { BSKY_MAX_ACCOUNTS } from '$lib/config/bsky';
+import { getOverrides } from '$lib/services/accountOverrides';
+import { getAccountsSnapshot as getTwitterAccountsSnapshot } from '$lib/services/twitterService';
+import { TWITTER_MAX_ACCOUNTS } from '$lib/config/twitter';
 
 type PlatformPlan = {
   platform: 'bsky' | 'twitter' | 'threads';
@@ -11,7 +15,8 @@ type PlatformPlan = {
   notes?: string;
   maxAccountsAllowed?: number;
   selected?: Array<{
-    did: string;
+    did?: string;        // Bluesky
+    user_id?: string;    // Twitter
     handle: string;
     displayName?: string;
     followersCount?: number;
@@ -22,12 +27,29 @@ type PlatformPlan = {
       reasons: string[];
     };
   }>;
+  overrides?: {
+    include: Array<{
+      identifier: string;
+      identifier_type: 'did' | 'handle' | 'user_id';
+      scope: 'global' | 'match';
+      match_id: string | null;
+      bypass_eligibility: boolean;
+      expires_at: string | null;
+    }>;
+    exclude: Array<{
+      identifier: string;
+      identifier_type: 'did' | 'handle' | 'user_id';
+      scope: 'global' | 'match';
+      match_id: string | null;
+      expires_at: string | null;
+    }>;
+  };
 };
 
 export const GET: RequestHandler = async ({ request }) => {
   try {
     // Admin-only guard: require ADMIN_SECRET via header
-    const adminSecret = process.env.ADMIN_SECRET;
+    const adminSecret = env.ADMIN_SECRET;
     if (!adminSecret) {
       return new Response(JSON.stringify({ error: 'admin_not_configured' }), {
         status: 501,
@@ -59,6 +81,26 @@ export const GET: RequestHandler = async ({ request }) => {
       const maxAllowed = Math.max(0, BSKY_MAX_ACCOUNTS);
       bskyPlan.maxAccountsAllowed = maxAllowed;
       bskyPlan.selected = (accounts ?? []).slice(0, maxAllowed);
+
+      // Attach override summary for transparency (gracefully empty if admin env missing)
+      const ov = await getOverrides({ platform: 'bsky' }).catch(() => ({ include: [], exclude: [] }));
+      bskyPlan.overrides = {
+        include: (ov.include || []).map((o) => ({
+          identifier: o.identifier,
+          identifier_type: o.identifier_type,
+          scope: o.scope,
+          match_id: o.match_id,
+          bypass_eligibility: o.bypass_eligibility,
+          expires_at: o.expires_at
+        })),
+        exclude: (ov.exclude || []).map((o) => ({
+          identifier: o.identifier,
+          identifier_type: o.identifier_type,
+          scope: o.scope,
+          match_id: o.match_id,
+          expires_at: o.expires_at
+        }))
+      };
     }
 
     // Twitter/X
@@ -71,6 +113,41 @@ export const GET: RequestHandler = async ({ request }) => {
       notes: twitterCfg.notes
     };
 
+    if (twitterCfg.status === 'ok') {
+      // If configured, compute a selection using overrides-aware twitter service
+      const cap = estimateMaxAccounts('twitter');
+      const maxAllowedTw = cap?.maxAccounts ?? Math.max(0, TWITTER_MAX_ACCOUNTS);
+      twitterPlan.maxAccountsAllowed = maxAllowedTw;
+      (twitterPlan as any).capRationale = cap?.rationale ?? null;
+
+      const accountsTw = await getTwitterAccountsSnapshot().catch(() => [] as PlatformPlan['selected']);
+      twitterPlan.selected = (accountsTw ?? []).slice(0, maxAllowedTw);
+    }
+
+    // Attach twitter overrides summary (gracefully empty if admin env missing)
+    try {
+      const ovTw = await getOverrides({ platform: 'twitter' }).catch(() => ({ include: [], exclude: [] }));
+      twitterPlan.overrides = {
+        include: (ovTw.include || []).map((o) => ({
+          identifier: o.identifier,
+          identifier_type: o.identifier_type,
+          scope: o.scope,
+          match_id: o.match_id,
+          bypass_eligibility: (o as any).bypass_eligibility ?? false,
+          expires_at: o.expires_at
+        })),
+        exclude: (ovTw.exclude || []).map((o) => ({
+          identifier: o.identifier,
+          identifier_type: o.identifier_type,
+          scope: o.scope,
+          match_id: o.match_id,
+          expires_at: o.expires_at
+        }))
+      };
+    } catch {
+      // ignore
+    }
+
     // Threads
     const threadsCfg = getPlatformCostConfig('threads');
     const threadsPlan: PlatformPlan = {
@@ -80,6 +157,39 @@ export const GET: RequestHandler = async ({ request }) => {
       costPerMonthDollars: threadsCfg.costPerMonthDollars,
       notes: threadsCfg.notes
     };
+
+    if (threadsCfg.status === 'ok') {
+      const capTh = estimateMaxAccounts('threads');
+      const maxAllowedTh = capTh?.maxAccounts ?? undefined;
+      if (typeof maxAllowedTh === 'number') {
+        threadsPlan.maxAccountsAllowed = maxAllowedTh;
+        (threadsPlan as any).capRationale = capTh?.rationale ?? null;
+      }
+    }
+
+    // Attach threads overrides summary (gracefully empty if admin env missing)
+    try {
+      const ovTh = await getOverrides({ platform: 'threads' }).catch(() => ({ include: [], exclude: [] }));
+      threadsPlan.overrides = {
+        include: (ovTh.include || []).map((o) => ({
+          identifier: o.identifier,
+          identifier_type: o.identifier_type,
+          scope: o.scope,
+          match_id: o.match_id,
+          bypass_eligibility: (o as any).bypass_eligibility ?? false,
+          expires_at: o.expires_at
+        })),
+        exclude: (ovTh.exclude || []).map((o) => ({
+          identifier: o.identifier,
+          identifier_type: o.identifier_type,
+          scope: o.scope,
+          match_id: o.match_id,
+          expires_at: o.expires_at
+        }))
+      };
+    } catch {
+      // ignore
+    }
 
     const payload = {
       generatedAt,

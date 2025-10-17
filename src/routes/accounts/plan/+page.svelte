@@ -15,9 +15,19 @@
     budgetPerMonthDollars: number;
     costPerMonthDollars: number | null;
     notes?: string;
-    maxAccountsAllowed?: number;
-    selected?: Array<{
-      did: string;
+  maxAccountsAllowed?: number;
+  capRationale?: {
+    budget: number;
+    costPer1k: number;
+    requestsPerAccPerMin: number;
+    matchesPerMonth: number;
+    minutesPerMatch: number;
+    monthlyReqsPerAcc: number;
+    monthlyCostPerAcc: number;
+    buffer: number;
+  } | null;
+  selected?: Array<{
+    did: string;
       handle: string;
       displayName?: string;
       followersCount?: number;
@@ -25,6 +35,23 @@
       createdAt?: string | null;
       eligibility: { eligible: boolean; reasons: string[] };
     }>;
+    overrides?: {
+      include: Array<{
+        identifier: string;
+        identifier_type: 'did' | 'handle' | 'user_id';
+        scope: 'global' | 'match';
+        match_id: string | null;
+        bypass_eligibility: boolean;
+        expires_at: string | null;
+      }>;
+      exclude: Array<{
+        identifier: string;
+        identifier_type: 'did' | 'handle' | 'user_id';
+        scope: 'global' | 'match';
+        match_id: string | null;
+        expires_at: string | null;
+      }>;
+    };
   };
 
   const { platforms, budgetPerPlatformDollars, generatedAt } = data;
@@ -158,6 +185,41 @@
       {:else}
         <div class="muted" style="margin-top:0.5rem;">No accounts selected or not configured.</div>
       {/if}
+
+      {#if platforms.bsky.overrides}
+        <div class="list" style="margin-top:0.75rem;">
+          <h3>Overrides</h3>
+          <div class="hstack">
+            <div class="chip">Includes: {platforms.bsky.overrides.include?.length ?? 0}</div>
+            <div class="chip">Excludes: {platforms.bsky.overrides.exclude?.length ?? 0}</div>
+          </div>
+
+          {#if (platforms.bsky.overrides.include?.length ?? 0) > 0}
+            <div class="chips" style="margin-top:0.35rem;">
+              {#each platforms.bsky.overrides.include as o}
+                <span class="chip">
+                  + {o.identifier}
+                  {#if o.scope === 'match'} (match: {o.match_id}){/if}
+                  {#if o.bypass_eligibility} • bypass{/if}
+                  {#if o.expires_at} • exp: {new Date(o.expires_at).toLocaleDateString()}{/if}
+                </span>
+              {/each}
+            </div>
+          {/if}
+
+          {#if (platforms.bsky.overrides.exclude?.length ?? 0) > 0}
+            <div class="chips" style="margin-top:0.35rem;">
+              {#each platforms.bsky.overrides.exclude as o}
+                <span class="chip">
+                  − {o.identifier}
+                  {#if o.scope === 'match'} (match: {o.match_id}){/if}
+                  {#if o.expires_at} • exp: {new Date(o.expires_at).toLocaleDateString()}{/if}
+                </span>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {/if}
     </div>
 
     <!-- Twitter -->
@@ -172,7 +234,27 @@
       <div class="hstack" style="margin-top:0.5rem;">
         <div>Budget: ${platforms.twitter.budgetPerMonthDollars}</div>
         <div>Cost: {platforms.twitter.costPerMonthDollars == null ? '—' : `$${platforms.twitter.costPerMonthDollars}`}</div>
+        {#if platforms.twitter.maxAccountsAllowed != null}
+          <div>Max accounts: {platforms.twitter.maxAccountsAllowed}</div>
+        {/if}
       </div>
+
+      {#if platforms.twitter.capRationale}
+        <div class="list" style="margin-top:0.5rem;">
+          <h3>Cap Rationale</h3>
+          <div class="chips">
+            <span class="chip">budget ${platforms.twitter.capRationale.budget}</span>
+            <span class="chip">cost/1k {platforms.twitter.capRationale.costPer1k}</span>
+            <span class="chip">req/min/acc {platforms.twitter.capRationale.requestsPerAccPerMin}</span>
+            <span class="chip">matches/mo {platforms.twitter.capRationale.matchesPerMonth}</span>
+            <span class="chip">mins/match {platforms.twitter.capRationale.minutesPerMatch}</span>
+            <span class="chip">req/mo/acc {Math.round(platforms.twitter.capRationale.monthlyReqsPerAcc)}</span>
+            <span class="chip">cost/mo/acc ${platforms.twitter.capRationale.monthlyCostPerAcc}</span>
+            <span class="chip">buffer ×{platforms.twitter.capRationale.buffer}</span>
+          </div>
+        </div>
+      {/if}
+
       {#if platforms.twitter.status === 'unconfigured'}
         <div class="muted" style="margin-top:0.5rem;">
           To enable, set TWITTER_COST_PER_MONTH_DOLLARS in your environment (must be ≤ ${budgetPerPlatformDollars}).
@@ -192,10 +274,65 @@
       <div class="hstack" style="margin-top:0.5rem;">
         <div>Budget: ${platforms.threads.budgetPerMonthDollars}</div>
         <div>Cost: {platforms.threads.costPerMonthDollars == null ? '—' : `$${platforms.threads.costPerMonthDollars}`}</div>
+        {#if platforms.threads.maxAccountsAllowed != null}
+          <div>Max accounts: {platforms.threads.maxAccountsAllowed}</div>
+        {/if}
       </div>
+
+      {#if platforms.threads.capRationale}
+        <div class="list" style="margin-top:0.5rem;">
+          <h3>Cap Rationale</h3>
+          <div class="chips">
+            <span class="chip">budget ${platforms.threads.capRationale.budget}</span>
+            <span class="chip">cost/1k {platforms.threads.capRationale.costPer1k}</span>
+            <span class="chip">req/min/acc {platforms.threads.capRationale.requestsPerAccPerMin}</span>
+            <span class="chip">matches/mo {platforms.threads.capRationale.matchesPerMonth}</span>
+            <span class="chip">mins/match {platforms.threads.capRationale.minutesPerMatch}</span>
+            <span class="chip">req/mo/acc {Math.round(platforms.threads.capRationale.monthlyReqsPerAcc)}</span>
+            <span class="chip">cost/mo/acc ${platforms.threads.capRationale.monthlyCostPerAcc}</span>
+            <span class="chip">buffer ×{platforms.threads.capRationale.buffer}</span>
+          </div>
+        </div>
+      {/if}
+
       {#if platforms.threads.status === 'unconfigured'}
         <div class="muted" style="margin-top:0.5rem;">
           To enable, set THREADS_COST_PER_MONTH_DOLLARS in your environment (must be ≤ ${budgetPerPlatformDollars}).
+        </div>
+      {/if}
+
+      {#if platforms.threads.overrides}
+        <div class="list" style="margin-top:0.75rem;">
+          <h3>Overrides</h3>
+          <div class="hstack">
+            <div class="chip">Includes: {platforms.threads.overrides.include?.length ?? 0}</div>
+            <div class="chip">Excludes: {platforms.threads.overrides.exclude?.length ?? 0}</div>
+          </div>
+
+          {#if (platforms.threads.overrides.include?.length ?? 0) > 0}
+            <div class="chips" style="margin-top:0.35rem;">
+              {#each platforms.threads.overrides.include as o}
+                <span class="chip">
+                  + {o.identifier}
+                  {#if o.scope === 'match'} (match: {o.match_id}){/if}
+                  {#if o.bypass_eligibility} • bypass{/if}
+                  {#if o.expires_at} • exp: {new Date(o.expires_at).toLocaleDateString()}{/if}
+                </span>
+              {/each}
+            </div>
+          {/if}
+
+          {#if (platforms.threads.overrides.exclude?.length ?? 0) > 0}
+            <div class="chips" style="margin-top:0.35rem;">
+              {#each platforms.threads.overrides.exclude as o}
+                <span class="chip">
+                  − {o.identifier}
+                  {#if o.scope === 'match'} (match: {o.match_id}){/if}
+                  {#if o.expires_at} • exp: {new Date(o.expires_at).toLocaleDateString()}{/if}
+                </span>
+              {/each}
+            </div>
+          {/if}
         </div>
       {/if}
     </div>

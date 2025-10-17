@@ -1,0 +1,73 @@
+# Triggers the 30-day account re-evaluation job
+# Requires repository/environment secrets:
+#   - APP_BASE_URL: Base URL of your deployed app (e.g., https://your-app.vercel.app)
+#   - ADMIN_SECRET: Same value as your server's ADMIN_SECRET env var
+#
+# This will call POST /api/admin/accounts/revalidate to:
+#   - Refresh Bluesky allowlist into accounts_registry with stale flags
+#   - Purge expired overrides from account_overrides
+name: Account Revalidation (30 days)
+
+on:
+  schedule:
+    # At 06:00 on day-of-month 1. Adjust as you see fit.
+    - cron: "0 6 1 * *"
+  workflow_dispatch:
+    inputs:
+      baseUrl:
+        description: "Override APP_BASE_URL for manual runs"
+        required: false
+        type: string
+
+jobs:
+  revalidate:
+    runs-on: ubuntu-latest
+    env:
+      APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+      ADMIN_SECRET: ${{ secrets.ADMIN_SECRET }}
+    steps:
+      - name: Determine base URL
+        id: base
+        if: ${{ github.event_name == 'workflow_dispatch' || (env.APP_BASE_URL != '' && env.ADMIN_SECRET != '') }}
+        run: |
+          if [ -n "${{ github.event.inputs.baseUrl }}" ]; then
+            echo "BASE_URL=${{ github.event.inputs.baseUrl }}" >> $GITHUB_OUTPUT
+          else
+            echo "BASE_URL=${{ env.APP_BASE_URL }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Call revalidation endpoint
+        if: ${{ github.event_name == 'workflow_dispatch' || (env.APP_BASE_URL != '' && env.ADMIN_SECRET != '') }}
+        env:
+          ADMIN_SECRET: ${{ env.ADMIN_SECRET }}
+          BASE_URL: ${{ steps.base.outputs.BASE_URL }}
+        run: |
+          if [ -z "$BASE_URL" ]; then
+            echo "ERROR: BASE_URL is empty. Set APP_BASE_URL secret or provide baseUrl input." >&2
+            exit 1
+          fi
+
+          if [ -z "$ADMIN_SECRET" ]; then
+            echo "ERROR: ADMIN_SECRET is empty. Set ADMIN_SECRET in repository or environment secrets." >&2
+            exit 1
+          fi
+
+          echo "Calling $BASE_URL/api/admin/accounts/revalidate"
+          http_code=$(curl -sS --fail --max-time 30 --retry 3 --retry-delay 2 \
+            -o /tmp/resp.json -w "%{http_code}" \
+            -X POST "$BASE_URL/api/admin/accounts/revalidate" \
+            -H "x-admin-token: $ADMIN_SECRET" \
+            -H "Content-Type: application/json" \
+            --data '{}' || true)
+
+          echo "HTTP $http_code"
+          if [ -f /tmp/resp.json ]; then
+            echo "Preview (truncated to 1KB):"
+            head -c 1024 /tmp/resp.json | tr -d '\0'
+            echo ""
+          fi
+
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "Revalidation failed with HTTP $http_code" >&2
+            exit 1
+          fi
