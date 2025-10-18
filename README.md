@@ -1,6 +1,6 @@
-# Arsenal Matchday Pulse
+# Slack MCP
 
-This repository powers a SvelteKit app that synthesizes Arsenal fan sentiment during matchdays across social platforms (Bluesky, X/Twitter, Threads). It provides livestream SSE feeds, transparency pages, and (in this phase) authentication scaffolding and comments.
+This repository powers a SvelteKit app that provides Slack integration via Model Context Protocol (MCP). It offers HTTP-based API endpoints for Slack operations and can be deployed as a remote MCP server.
 
 Branching and PR workflow
 - Base branch: main

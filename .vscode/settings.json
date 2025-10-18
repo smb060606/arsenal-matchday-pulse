@@ -1,0 +1,16 @@
+{
+  // Force VS Code integrated terminal to use bash for this workspace (bypasses zsh -l)
+  "terminal.integrated.defaultProfile.osx": "bash",
+  "terminal.integrated.profiles.osx": {
+    "bash": {
+      "path": "/bin/bash",
+      "args": []
+    },
+    "zsh": {
+      "path": "/bin/zsh",
+      "args": ["-l"]
+    }
+  },
+  // Ensure the shell integration doesn't block opening
+  "terminal.integrated.enablePersistentSessions": false
+}

@@ -1,8 +1,9 @@
 {
-  "name": "arsenal-matchday-pulse",
+  "name": "slack-mcp",
   "version": "0.0.1",
   "private": true,
   "type": "module",
+  "main": "index.js",
   "engines": {
     "node": "20.x"
   },
@@ -10,6 +11,8 @@
     "predev": "echo skip svelte-kit sync",
     "dev": "vite dev --port 5173 --strictPort",
     "build": "vite build",
+    "start": "node remote-slack-mcp-server.cjs",
+    "post:remote": "node scripts/post-latest-pr-remote.mjs",
     "preview": "svelte-kit preview --port 4173 --host",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "postinstall": "echo skip svelte-kit sync",
@@ -26,7 +29,11 @@
     "@modelcontextprotocol/sdk": "^1.20.1",
     "@slack/web-api": "^7.11.0",
     "@supabase/supabase-js": "^2.75.0",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "morgan": "^1.10.1",
     "openai": "^6.3.0",
     "resend": "^6.1.2",
     "wink-sentiment": "^5.0.0"

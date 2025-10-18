@@ -8,3 +8,4 @@ dist
 
 # Vercel build output
 .vercel/
+.vercel
