@@ -31,6 +31,21 @@ const requireAuth = (req, res, next) => {
 // Initialize Slack client
 const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
 
+// Root endpoint - welcome message
+app.get('/', (req, res) => {
+  res.json({
+    service: 'Remote Slack MCP Server',
+    version: '1.0.0',
+    status: 'running',
+    endpoints: {
+      health: 'GET /health',
+      tools: 'POST /mcp/tools (requires Bearer auth)',
+      call: 'POST /mcp/call (requires Bearer auth)'
+    },
+    documentation: 'See README-remote-mcp.md for usage details'
+  });
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ 
