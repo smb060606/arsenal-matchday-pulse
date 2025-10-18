@@ -1,0 +1,63 @@
+name: PR Merge - Post commits to Slack via Remote MCP
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  notify-slack:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Build commit list
+        env:
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "Fetching commits for PR #${PR_NUMBER} from ${OWNER}/${REPO}..."
+          COMMITS=$(
+            curl -s \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${OWNER}/${REPO}/pulls/${PR_NUMBER}/commits" \
+            | jq -r '.[] | "\(.sha[0:7]) - \(.commit.message | split("\n")[0])"'
+          )
+          echo "Commit lines:"
+          echo "${COMMITS}"
+          {
+            echo "COMMITS<<EOF"
+            echo "${COMMITS}"
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+
+      - name: Post to Slack via remote MCP
+        env:
+          MCP_BASE_URL: ${{ secrets.MCP_BASE_URL }}
+          MCP_AUTH_TOKEN: ${{ secrets.MCP_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${MCP_BASE_URL:-}" ] || [ -z "${MCP_AUTH_TOKEN:-}" ]; then
+            echo "Missing MCP_BASE_URL or MCP_AUTH_TOKEN secrets"
+            exit 1
+          fi
+          echo "Posting to Slack via MCP at ${MCP_BASE_URL} ..."
+          PAYLOAD=$(jq -n --arg channel "#cline" --arg text "$COMMITS" \
+            '{name:"send_message", arguments:{channel:$channel, text:$text}}')
+          curl -s -X POST "${MCP_BASE_URL%/}/mcp/call" \
+            -H "Authorization: Bearer ${MCP_AUTH_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data "$PAYLOAD" | jq .
