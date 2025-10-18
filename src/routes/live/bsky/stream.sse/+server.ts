@@ -3,11 +3,12 @@ import { buildTick } from '$lib/services/bskyService';
 import { DEFAULT_RECENCY_MINUTES, DEFAULT_TICK_INTERVAL_SEC } from '$lib/config/bsky';
 import { getWindowState, DEFAULT_LIVE_DURATION_MIN } from '$lib/utils/matchWindow';
 
-export const GET: RequestHandler = async ({ setHeaders, url }) => {
+export const GET: RequestHandler = async ({ setHeaders, url, request }) => {
   const sseHeaders = {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache, no-transform',
-    Connection: 'keep-alive'
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no'
   } as const;
 
   // In SvelteKit runtime, setHeaders is provided on the event.
@@ -36,9 +37,20 @@ export const GET: RequestHandler = async ({ setHeaders, url }) => {
   const nSince = Number(url.searchParams.get('sinceMin'));
   const sinceMin = Number.isFinite(nSince) && nSince > 0 ? nSince : DEFAULT_RECENCY_MINUTES;
 
+  // Support resuming from Last-Event-ID (header or query param ?lastEventId=)
+  const lastEventIdHeader = request?.headers?.get('last-event-id') || null;
+  const lastEventIdParam = url.searchParams.get('lastEventId');
+  const parsedLast = Number(lastEventIdParam ?? lastEventIdHeader);
+  const startTick = Number.isFinite(parsedLast) && parsedLast >= 0 ? parsedLast + 1 : 0;
+
+  // Heartbeat keep-alive interval (seconds)
+  const nHeartbeat = Number(url.searchParams.get('heartbeatSec'));
+  const heartbeatSec = Number.isFinite(nHeartbeat) && nHeartbeat > 0 ? nHeartbeat : 15;
+
   const encoder = new TextEncoder();
   let stopped = false;
   let closer: ReturnType<typeof setTimeout> | null = null;
+  let pinger: ReturnType<typeof setInterval> | null = null;
 
   const stream = new ReadableStream({
     start(controller) {
@@ -52,9 +64,20 @@ export const GET: RequestHandler = async ({ setHeaders, url }) => {
         mode: forceWindow ? `force:${forceWindow}` : 'dynamic'
       };
       controller.enqueue(encoder.encode(`: stream start\n`));
+      // Suggest client reconnection delay (ms)
+      controller.enqueue(encoder.encode(`retry: ${Math.max(1000, intervalSec * 1000)}\n`));
       controller.enqueue(encoder.encode(`event: meta\ndata: ${JSON.stringify(intro)}\n\n`));
 
-      let tick = 0;
+      // Heartbeat comments to keep proxies/connections alive
+      pinger = setInterval(() => {
+        try {
+          controller.enqueue(encoder.encode(`: keep-alive ${Date.now()}\n\n`));
+        } catch {
+          // ignore enqueue errors on closed controller
+        }
+      }, heartbeatSec * 1000);
+
+      let tick = startTick;
 
       const loop = async () => {
         while (!stopped) {
@@ -65,7 +88,8 @@ export const GET: RequestHandler = async ({ setHeaders, url }) => {
 
             // Build and send tick
             const payload = await buildTick(matchId, dynamic as 'pre' | 'live' | 'post', tick++, sinceMin);
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+            // Include SSE id for resume support
+            controller.enqueue(encoder.encode(`id: ${tick}\ndata: ${JSON.stringify(payload)}\n\n`));
 
             // If window has ended, emit ended event and break after final tick
             if (!forceWindow && state === 'ended') {
@@ -80,6 +104,10 @@ export const GET: RequestHandler = async ({ setHeaders, url }) => {
         }
 
         // Close after loop exits
+        if (pinger) {
+          clearInterval(pinger);
+          pinger = null;
+        }
         try {
           controller.close();
         } catch {
@@ -98,6 +126,10 @@ export const GET: RequestHandler = async ({ setHeaders, url }) => {
       // Soft cap the connection to 15 minutes; client can reconnect
       closer = setTimeout(() => {
         stopped = true;
+        if (pinger) {
+          clearInterval(pinger);
+          pinger = null;
+        }
         try {
           controller.close();
         } catch {
@@ -110,6 +142,10 @@ export const GET: RequestHandler = async ({ setHeaders, url }) => {
       if (closer) {
         clearTimeout(closer);
         closer = null;
+      }
+      if (pinger) {
+        clearInterval(pinger);
+        pinger = null;
       }
     }
   });
