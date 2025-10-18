@@ -27,6 +27,34 @@ function env(name: string, fallback?: string) {
   return v && v.length > 0 ? v : fallback;
 }
 
+// Optional Slack MCP alerting (remote MCP) for ops visibility
+const ALERTS_MCP_BASE_URL = env('SUMMARIES_ALERTS_MCP_BASE_URL');
+const ALERTS_MCP_TOKEN = env('SUMMARIES_ALERTS_MCP_TOKEN');
+const ALERTS_CHANNEL = env('SUMMARIES_ALERTS_CHANNEL', '#cline');
+
+async function notifySlack(text: string) {
+  try {
+    if (!ALERTS_MCP_BASE_URL || !ALERTS_MCP_TOKEN) return;
+    const body = {
+      name: 'send_message',
+      arguments: {
+        channel: ALERTS_CHANNEL,
+        text
+      }
+    };
+    await fetch(`${ALERTS_MCP_BASE_URL.replace(/\/$/, '')}/mcp/call`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${ALERTS_MCP_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+  } catch {
+    // Avoid throwing from alerting
+  }
+}
+
 // Cap posts and characters to control cost/tokens
 const MAX_POSTS = 150;
 const MAX_CHARS = 12000;
@@ -140,6 +168,8 @@ export const GET: RequestHandler = async ({ url }) => {
     SUMMARY_REQ_TIMESTAMPS = SUMMARY_REQ_TIMESTAMPS.filter((ts) => now - ts < RATE_WINDOW_MS);
     if (SUMMARY_REQ_TIMESTAMPS.length >= RATE_MAX) {
       const retryAfterMs = RATE_WINDOW_MS - (now - SUMMARY_REQ_TIMESTAMPS[0]);
+      // Notice ops via Slack MCP (optional)
+      await notifySlack(`[summaries/latest] rate_limited: retry in ${Math.ceil(retryAfterMs / 1000)}s`);
       return new Response(JSON.stringify({ error: 'rate_limited', retryAfterMs }), {
         status: 429,
         headers: {
@@ -157,6 +187,8 @@ export const GET: RequestHandler = async ({ url }) => {
     const OPENAI_MODEL = env('OPENAI_MODEL', 'gpt-5');
 
     if (!OPENAI_API_KEY) {
+      // Notice ops (no API key)
+      await notifySlack('[summaries/latest] missing OPENAI_API_KEY');
       return new Response(
         JSON.stringify({
           error: 'missing_api_key',
@@ -209,6 +241,8 @@ export const GET: RequestHandler = async ({ url }) => {
       );
     } catch (err: any) {
       if (err?.name === 'AbortError' || err?.message === 'timeout') {
+        // Notice ops on timeouts
+        await notifySlack(`[summaries/latest] openai_timeout after ${timeoutMs}ms`);
         return new Response(JSON.stringify({ error: 'openai_timeout', timeoutMs }), {
           status: 504,
           headers: { 'Content-Type': 'application/json' }
@@ -238,6 +272,11 @@ export const GET: RequestHandler = async ({ url }) => {
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
     });
   } catch (e: any) {
+    // Structured log and optional Slack alert
+    try {
+      console.error('[summaries/latest] failed', { message: e?.message, stack: e?.stack });
+    } catch {}
+    await notifySlack(`[summaries/latest] summary_failed: ${e?.message ?? 'Unknown error'}`);
     return new Response(JSON.stringify({ error: 'summary_failed', message: e?.message ?? 'Unknown error' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
