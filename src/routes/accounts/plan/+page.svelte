@@ -27,14 +27,15 @@
     buffer: number;
   } | null;
   selected?: Array<{
-    did: string;
-      handle: string;
-      displayName?: string;
-      followersCount?: number;
-      postsCount?: number;
-      createdAt?: string | null;
-      eligibility: { eligible: boolean; reasons: string[] };
-    }>;
+    did?: string;
+    user_id?: string;
+    handle: string;
+    displayName?: string;
+    followersCount?: number;
+    postsCount?: number;
+    createdAt?: string | null;
+    eligibility: { eligible: boolean; reasons: string[] };
+  }>;
     overrides?: {
       include: Array<{
         identifier: string;
@@ -55,6 +56,43 @@
   };
 
   const { platforms, budgetPerPlatformDollars, generatedAt } = data;
+
+  // Local typings to satisfy TS in template for selected lists and overrides
+  type SelectedAccount = {
+    did?: string;
+    user_id?: string;
+    handle: string;
+    displayName?: string;
+    followersCount?: number;
+    postsCount?: number;
+    createdAt?: string | null;
+    eligibility?: { eligible: boolean; reasons: string[] };
+  };
+  type OverrideEntry = {
+    identifier: string;
+    identifier_type: 'did' | 'handle' | 'user_id';
+    scope: 'global' | 'match';
+    match_id: string | null;
+    bypass_eligibility?: boolean;
+    expires_at: string | null;
+  };
+
+  const bskySel = (platforms.bsky.selected ?? []) as SelectedAccount[];
+  const bskyOv = (platforms.bsky.overrides ?? { include: [], exclude: [] }) as {
+    include: OverrideEntry[];
+    exclude: OverrideEntry[];
+  };
+
+  const twSel = (platforms.twitter.selected ?? []) as SelectedAccount[];
+  const twOv = (platforms.twitter.overrides ?? { include: [], exclude: [] }) as {
+    include: OverrideEntry[];
+    exclude: OverrideEntry[];
+  };
+
+  const thOv = (platforms.threads.overrides ?? { include: [], exclude: [] }) as {
+    include: OverrideEntry[];
+    exclude: OverrideEntry[];
+  };
 </script>
 
 <style>
@@ -158,10 +196,10 @@
         {/if}
       </div>
 
-      {#if platforms.bsky.selected && platforms.bsky.selected.length}
+      {#if bskySel.length}
         <div class="list">
-          <h3>Selected Accounts ({platforms.bsky.selected.length})</h3>
-          {#each platforms.bsky.selected as a}
+          <h3>Selected Accounts ({bskySel.length})</h3>
+          {#each bskySel as a}
             <div class="account">
               <div class="hstack">
                 <strong>@{a.handle}</strong>
@@ -186,17 +224,17 @@
         <div class="muted" style="margin-top:0.5rem;">No accounts selected or not configured.</div>
       {/if}
 
-      {#if platforms.bsky.overrides}
+      {#if bskyOv}
         <div class="list" style="margin-top:0.75rem;">
           <h3>Overrides</h3>
           <div class="hstack">
-            <div class="chip">Includes: {platforms.bsky.overrides.include?.length ?? 0}</div>
-            <div class="chip">Excludes: {platforms.bsky.overrides.exclude?.length ?? 0}</div>
+            <div class="chip">Includes: {bskyOv.include?.length ?? 0}</div>
+            <div class="chip">Excludes: {bskyOv.exclude?.length ?? 0}</div>
           </div>
 
-          {#if (platforms.bsky.overrides.include?.length ?? 0) > 0}
+          {#if (bskyOv.include?.length ?? 0) > 0}
             <div class="chips" style="margin-top:0.35rem;">
-              {#each platforms.bsky.overrides.include as o}
+              {#each bskyOv.include as o}
                 <span class="chip">
                   + {o.identifier}
                   {#if o.scope === 'match'} (match: {o.match_id}){/if}
@@ -207,9 +245,9 @@
             </div>
           {/if}
 
-          {#if (platforms.bsky.overrides.exclude?.length ?? 0) > 0}
+          {#if (bskyOv.exclude?.length ?? 0) > 0}
             <div class="chips" style="margin-top:0.35rem;">
-              {#each platforms.bsky.overrides.exclude as o}
+              {#each bskyOv.exclude as o}
                 <span class="chip">
                   − {o.identifier}
                   {#if o.scope === 'match'} (match: {o.match_id}){/if}
@@ -252,6 +290,70 @@
             <span class="chip">cost/mo/acc ${platforms.twitter.capRationale.monthlyCostPerAcc}</span>
             <span class="chip">buffer ×{platforms.twitter.capRationale.buffer}</span>
           </div>
+        </div>
+      {/if}
+
+      {#if twSel.length}
+        <div class="list">
+          <h3>Selected Accounts ({twSel.length})</h3>
+          {#each twSel as a}
+            <div class="account">
+              <div class="hstack">
+                <strong>@{a.handle}</strong>
+                {#if a.displayName}<span class="muted">({a.displayName})</span>{/if}
+                {#if a.user_id}<span class="chip">id {a.user_id}</span>{/if}
+              </div>
+              <div class="chips">
+                {#if a.followersCount != null}<span class="chip">{a.followersCount} followers</span>{/if}
+                {#if a.postsCount != null}<span class="chip">{a.postsCount} posts</span>{/if}
+                {#if a.createdAt}<span class="chip">since {new Date(a.createdAt).toLocaleDateString()}</span>{/if}
+              </div>
+              {#if a.eligibility}
+                <div class="chips">
+                  {#each a.eligibility.reasons as r}
+                    <span class="chip">{r}</span>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {:else}
+        <div class="muted" style="margin-top:0.5rem;">No accounts selected or not configured.</div>
+      {/if}
+
+      {#if twOv}
+        <div class="list" style="margin-top:0.75rem;">
+          <h3>Overrides</h3>
+          <div class="hstack">
+            <div class="chip">Includes: {twOv.include?.length ?? 0}</div>
+            <div class="chip">Excludes: {twOv.exclude?.length ?? 0}</div>
+          </div>
+
+          {#if (twOv.include?.length ?? 0) > 0}
+            <div class="chips" style="margin-top:0.35rem;">
+              {#each twOv.include as o}
+                <span class="chip">
+                  + {o.identifier}
+                  {#if o.scope === 'match'} (match: {o.match_id}){/if}
+                  {#if o.bypass_eligibility} • bypass{/if}
+                  {#if o.expires_at} • exp: {new Date(o.expires_at).toLocaleDateString()}{/if}
+                </span>
+              {/each}
+            </div>
+          {/if}
+
+          {#if (twOv.exclude?.length ?? 0) > 0}
+            <div class="chips" style="margin-top:0.35rem;">
+              {#each twOv.exclude as o}
+                <span class="chip">
+                  − {o.identifier}
+                  {#if o.scope === 'match'} (match: {o.match_id}){/if}
+                  {#if o.expires_at} • exp: {new Date(o.expires_at).toLocaleDateString()}{/if}
+                </span>
+              {/each}
+            </div>
+          {/if}
         </div>
       {/if}
 
@@ -301,17 +403,17 @@
         </div>
       {/if}
 
-      {#if platforms.threads.overrides}
+      {#if thOv}
         <div class="list" style="margin-top:0.75rem;">
           <h3>Overrides</h3>
           <div class="hstack">
-            <div class="chip">Includes: {platforms.threads.overrides.include?.length ?? 0}</div>
-            <div class="chip">Excludes: {platforms.threads.overrides.exclude?.length ?? 0}</div>
+            <div class="chip">Includes: {thOv.include?.length ?? 0}</div>
+            <div class="chip">Excludes: {thOv.exclude?.length ?? 0}</div>
           </div>
 
-          {#if (platforms.threads.overrides.include?.length ?? 0) > 0}
+          {#if (thOv.include?.length ?? 0) > 0}
             <div class="chips" style="margin-top:0.35rem;">
-              {#each platforms.threads.overrides.include as o}
+              {#each thOv.include as o}
                 <span class="chip">
                   + {o.identifier}
                   {#if o.scope === 'match'} (match: {o.match_id}){/if}
@@ -322,9 +424,9 @@
             </div>
           {/if}
 
-          {#if (platforms.threads.overrides.exclude?.length ?? 0) > 0}
+          {#if (thOv.exclude?.length ?? 0) > 0}
             <div class="chips" style="margin-top:0.35rem;">
-              {#each platforms.threads.overrides.exclude as o}
+              {#each thOv.exclude as o}
                 <span class="chip">
                   − {o.identifier}
                   {#if o.scope === 'match'} (match: {o.match_id}){/if}
