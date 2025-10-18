@@ -195,6 +195,87 @@ describe('/live/bsky/stream.sse/+server', () => {
       const response = await GET({ url, request } as any);
       expect(response.status).toBe(200);
     });
+
+    it('should emit retry directive and meta event on connect', async () => {
+      const url = new URL('http://localhost/live/bsky/stream.sse?matchId=test&intervalSec=1&heartbeatSec=5');
+      const request = new Request(url);
+
+      const response = await GET({ url, request } as any);
+      const reader = response.body?.getReader();
+      expect(reader).toBeDefined();
+
+      if (reader) {
+        const { value } = await reader.read();
+        const text = new TextDecoder().decode(value);
+        expect(text).toContain(': stream start');
+        expect(text).toContain('retry: ');
+        expect(text).toContain('event: meta');
+        reader.releaseLock();
+      }
+    });
+
+    it('should include id on data frames and honor lastEventId resume', async () => {
+      vi.useFakeTimers();
+      try {
+        // Start with lastEventId=5 so the first emitted id should be >= 6
+        const url = new URL('http://localhost/live/bsky/stream.sse?matchId=test&intervalSec=1&heartbeatSec=5&lastEventId=5');
+        const request = new Request(url);
+
+        const response = await GET({ url, request } as any);
+        const reader = response.body?.getReader();
+        expect(reader).toBeDefined();
+
+        if (reader) {
+          // First chunk: intro/meta
+          await reader.read();
+
+          // Advance timers to trigger first tick
+          vi.advanceTimersByTime(1000);
+
+          const { value } = await reader.read();
+          const text = new TextDecoder().decode(value);
+
+          expect(text).toContain('data: ');
+          expect(text).toContain('id: ');
+          const match = text.match(/id:\s*(\d+)/);
+          expect(match).not.toBeNull();
+          if (match) {
+            const id = Number(match[1]);
+            expect(Number.isFinite(id)).toBe(true);
+            expect(id).toBeGreaterThanOrEqual(6);
+          }
+          reader.releaseLock();
+        }
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('should emit heartbeat comments', async () => {
+      vi.useFakeTimers();
+      try {
+        const url = new URL('http://localhost/live/bsky/stream.sse?matchId=test&intervalSec=2&heartbeatSec=1');
+        const request = new Request(url);
+
+        const response = await GET({ url, request } as any);
+        const reader = response.body?.getReader();
+        expect(reader).toBeDefined();
+
+        if (reader) {
+          // Read intro/meta first
+          await reader.read();
+
+          // Advance to trigger heartbeat
+          vi.advanceTimersByTime(1000);
+
+          const { value } = await reader.read();
+          const text = new TextDecoder().decode(value);
+          expect(text).toContain(': keep-alive');
+          reader.releaseLock();
+        }
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });
-

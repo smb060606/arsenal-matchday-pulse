@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { getLiveBin } from '$lib/utils/matchWindow';
+import { createSSEClient, type SSEClientController } from '$lib/utils/sseClient';
   export let data: {
     matchId: string;
     kickoff: string;
@@ -27,35 +28,37 @@
 
   function connect(platform: 'bsky' | 'twitter') {
     const url = sseUrl(platform);
-    const es = new EventSource(url);
-    es.addEventListener('meta', (ev) => {
-      messages = [`${platform.toUpperCase()} :: [meta] ${ev.data}`, ...messages].slice(0, 200);
-    });
-    es.addEventListener('ended', (ev) => {
-      messages = [`${platform.toUpperCase()} :: [ended] ${ev.data}`, ...messages].slice(0, 200);
-      es.close();
-    });
-    es.onmessage = (ev) => {
-      messages = [`${platform.toUpperCase()} :: ${ev.data}`, ...messages].slice(0, 200);
-      // Attempt to parse payload and extract live accounts list (for Bluesky transparency)
-      try {
-        const payload = JSON.parse(ev.data);
-        if (payload && payload.platform === 'bsky' && Array.isArray(payload.accountsUsed)) {
-          accountsUsedLive = payload.accountsUsed.map((a: any) => ({
+    const client = createSSEClient<any>(url, {
+      namedListeners: {
+        meta: (ev) => {
+          messages = [`${platform.toUpperCase()} :: [meta] ${ev.data}`, ...messages].slice(0, 200);
+        },
+        ended: (ev) => {
+          messages = [`${platform.toUpperCase()} :: [ended] ${ev.data}`, ...messages].slice(0, 200);
+          client.stop();
+        }
+      },
+      onMessage: (data, ev) => {
+        // Keep raw message line for UI, but also parse JSON for live accounts list
+        messages = [`${platform.toUpperCase()} :: ${ev.data}`, ...messages].slice(0, 200);
+        if (data && data.platform === 'bsky' && Array.isArray((data as any).accountsUsed)) {
+          accountsUsedLive = (data as any).accountsUsed.map((a: any) => ({
             did: a?.did,
             handle: a?.handle,
             displayName: a?.displayName
           }));
         }
-      } catch {
-        // Non-JSON message; ignore
-      }
-    };
-    es.onerror = () => { /* keep connection open to allow auto-reconnect */ };
-    return es;
+      },
+      onOpen: () => { /* connection established */ },
+      onError: () => { /* auto-reconnect handled internally */ },
+      backoffBaseMs: 1000,
+      backoffMaxMs: 30000
+    });
+    client.start();
+    return client;
   }
 
-  let esB: EventSource | null = null;
+  let esB: SSEClientController | null = null;
   // Twitter SSE exists as placeholder; keep disabled until configured
   // let esT: EventSource | null = null;
 
@@ -66,7 +69,7 @@
     updateLiveBinLabel();
     const t = setInterval(updateLiveBinLabel, 30000);
     return () => {
-      esB?.close();
+      esB?.stop();
       // esT?.close();
       clearInterval(t);
     };
