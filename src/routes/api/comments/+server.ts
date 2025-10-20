@@ -9,7 +9,7 @@ const ALLOWED_PLATFORMS: Platform[] = ['bsky', 'twitter', 'threads', 'combined']
 const COMMENTS_MEM = new Map<string, Comment[]>(); // key = matchId
 const COMMENTS_TTL = new Map<string, number>(); // key = matchId, value = expiry timestamp
 const MAX_COMMENTS_PER_MATCH = 1000; // Maximum comments per match to prevent memory bloat
-const COMMENTS_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours TTL
+const COMMENTS_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days TTL for fallback storage
 
 // Cleanup expired entries
 function cleanupExpiredComments() {
