@@ -184,7 +184,7 @@ export const GET: RequestHandler = async ({ url }) => {
     }
 
     const OPENAI_API_KEY = env('OPENAI_API_KEY');
-    const OPENAI_MODEL = env('OPENAI_MODEL', 'gpt-5');
+    const OPENAI_MODEL = env('OPENAI_MODEL', 'gpt-4o-mini');
 
     if (!OPENAI_API_KEY) {
       // Notice ops (no API key)
